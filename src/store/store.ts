@@ -97,6 +97,16 @@ export class Store {
     return rows.map(toEvent);
   }
 
+  /** Most recent events of a channel before the given event (exclusive), oldest first. */
+  async recentChannelEvents(key: string, beforeEventId: number, limit: number): Promise<StoredEvent[]> {
+    const { rows } = await this.db.query(
+      `SELECT * FROM (SELECT * FROM events WHERE channel_key = $1 AND id < $2
+                      ORDER BY sent_at DESC, id DESC LIMIT $3) t ORDER BY sent_at ASC, id ASC`,
+      [key, beforeEventId, limit],
+    );
+    return rows.map(toEvent);
+  }
+
   async lastEventInThread(key: string, threadRef: string): Promise<StoredEvent | null> {
     const { rows } = await this.db.query(
       `SELECT * FROM events WHERE channel_key = $1 AND thread_ref = $2 ORDER BY sent_at DESC, id DESC LIMIT 1`,

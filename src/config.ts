@@ -22,6 +22,11 @@ const schema = z.object({
   /** "requesty" attaches channel/trace metadata in Requesty's format; "none" sends plain OpenAI requests. */
   LLM_METADATA_STYLE: z.enum(["requesty", "none"]).default("requesty"),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  /**
+   * How triage asks for JSON. "none" (default) relies on the prompt + lenient parsing and works with every model;
+   * "json_object" / "json_schema" use the OpenAI response_format when your model/gateway supports it.
+   */
+  LLM_STRUCTURED_OUTPUT: z.enum(["none", "json_object", "json_schema"]).default("none"),
 
   // --- Slack (enabled when both tokens are set) ---
   SLACK_BOT_TOKEN: z.string().optional(),

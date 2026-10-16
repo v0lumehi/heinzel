@@ -35,10 +35,15 @@ export class SlackAdapter implements ChatAdapter {
       appToken: opts.appToken,
       socketMode: true,
       logLevel: LogLevel.WARN,
+      // Initialize (token verification) in start(), so connection errors surface there instead of as unhandled rejections.
+      deferInitialization: true,
+      // Default is ~10 retries over 30 minutes; fail faster so misconfiguration surfaces at startup.
+      clientOptions: { retryConfig: { retries: 3, factor: 2, minTimeout: 1000 } },
     });
   }
 
   async start(onEvent: EventHandler): Promise<void> {
+    await this.app.init();
     const auth = await this.app.client.auth.test();
     if (!auth.user_id || !auth.bot_id) throw new Error("Slack auth.test did not return a bot identity. Is SLACK_BOT_TOKEN a bot token (xoxb-)?");
     this.me = { botUserId: auth.user_id, botId: auth.bot_id };

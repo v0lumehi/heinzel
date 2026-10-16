@@ -51,13 +51,20 @@ const worker = new Worker(queue, engine.handlers(), log.child({ component: "work
 await worker.start();
 
 for (const adapter of adapters.values()) {
-  await adapter.start(async (event) => {
-    try {
-      await engine.handleIncoming(event);
-    } catch (err) {
-      log.error({ err, platform: event.platform, channel: event.channelId }, "failed to handle incoming event");
-    }
-  });
+  try {
+    await adapter.start(async (event) => {
+      try {
+        await engine.handleIncoming(event);
+      } catch (err) {
+        log.error({ err, platform: event.platform, channel: event.channelId }, "failed to handle incoming event");
+      }
+    });
+  } catch (err) {
+    log.fatal({ err, platform: adapter.platform }, "could not connect to chat platform (check tokens and network)");
+    await worker.stop();
+    await db.end();
+    process.exit(1);
+  }
 }
 log.info({ platforms: [...adapters.keys()], agentModel: config.LLM_MODEL_AGENT, triageModel: config.LLM_MODEL_TRIAGE }, `${config.BOT_NAME} is running`);
 

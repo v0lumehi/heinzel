@@ -14,6 +14,10 @@ export interface PromptInput {
   reason?: string;
   memories: Memory[];
   now: Date;
+  /** The escalate tool is available (heavy model configured and within budget). */
+  canEscalate?: boolean;
+  /** This run is on the heavy model (after escalation, triage routing or !deep). */
+  heavy?: { reason: string };
 }
 
 export function buildSystemPrompt(p: PromptInput): string {
@@ -32,6 +36,20 @@ export function buildSystemPrompt(p: PromptInput): string {
     "- Use `schedule_followup` when someone commits to something or a question is left open and checking back later would help.",
     "- Never reveal or store secrets, tokens or credentials.",
   ];
+
+  if (p.canEscalate) {
+    parts.push(
+      "- If the task needs deep reasoning (multi-step analysis or planning, non-trivial code, long documents, careful trade-offs),",
+      "  call `escalate` right away instead of attempting it. A stronger model then takes over with the same context.",
+    );
+  }
+  if (p.heavy) {
+    parts.push(
+      "",
+      `This task was routed to you as the stronger model because: ${p.heavy.reason}`,
+      "Take the time to reason carefully, but keep the final chat message focused and readable.",
+    );
+  }
 
   if (p.mode === "ambient") {
     parts.push(

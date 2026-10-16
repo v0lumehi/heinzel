@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import type { LlmClient, LlmMessage, LlmRequest } from "../llm/client.js";
-import { toLlmTools, type AgentTool, type ToolContext } from "./tools.js";
+import { ESCALATE_TOOL, toLlmTools, type AgentTool, type ToolContext } from "./tools.js";
 
 export interface AgentRunInput {
   model: string;
@@ -17,6 +17,8 @@ export interface AgentRunResult {
   text: string;
   steps: number;
   toolCalls: { name: string; ok: boolean }[];
+  /** Set when the model called the escalate tool; the caller should re-run the task on the heavy model. */
+  escalation?: { reason: string };
 }
 
 /** Marker the model returns when it decides not to post anything. */
@@ -48,6 +50,19 @@ export async function runAgent(llm: LlmClient, input: AgentRunInput, log: Logger
 
     if (res.toolCalls.length === 0 || lastStep) {
       return { text: (res.content ?? "").trim(), steps: step, toolCalls: calls };
+    }
+
+    const esc = res.toolCalls.find((tc) => tc.name === ESCALATE_TOOL && byName.has(ESCALATE_TOOL));
+    if (esc) {
+      let reason = "needs deeper reasoning";
+      try {
+        const parsed = JSON.parse(esc.arguments || "{}") as { reason?: unknown };
+        if (typeof parsed.reason === "string" && parsed.reason.trim()) reason = parsed.reason.trim().slice(0, 500);
+      } catch {
+        // keep default reason
+      }
+      calls.push({ name: ESCALATE_TOOL, ok: true });
+      return { text: "", steps: step, toolCalls: calls, escalation: { reason } };
     }
 
     messages.push({

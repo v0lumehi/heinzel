@@ -133,6 +133,27 @@ const followupTool: AgentTool<{ hours: number; note: string }> = {
   },
 };
 
+/** Name of the control tool that hands the task to the heavy model. Handled by the runner, not executed. */
+export const ESCALATE_TOOL = "escalate";
+
+export const escalateTool: AgentTool<{ reason: string }> = {
+  name: ESCALATE_TOOL,
+  description:
+    "Hand this task to a stronger model when it needs deep reasoning: multi-step analysis or planning, non-trivial code, " +
+    "long documents, careful trade-offs, or when you tried and are not confident. Call it early, before writing an answer. " +
+    "Do not call it for simple questions, lookups or chit-chat.",
+  args: z.object({ reason: z.string().min(3).max(500) }),
+  parameters: {
+    type: "object",
+    properties: { reason: { type: "string", description: "Why this needs the stronger model, in one sentence." } },
+    required: ["reason"],
+    additionalProperties: false,
+  },
+  async run() {
+    return "Escalation is handled by the runtime.";
+  },
+};
+
 export function followupDedupeKey(channelKey: string, threadRef: string): string {
   return `followup:${channelKey}:${threadRef}`;
 }

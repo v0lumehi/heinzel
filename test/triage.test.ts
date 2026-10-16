@@ -15,7 +15,7 @@ describe("extractJsonObject", () => {
 describe("parseTriageDecision", () => {
   it("normalizes strict-schema placeholders", () => {
     const d = parseTriageDecision('{"action":"reply","confidence":0.9,"reason":"open question","memory":"","follow_up_hours":0}');
-    expect(d).toEqual({ action: "reply", confidence: 0.9, reason: "open question" });
+    expect(d).toEqual({ action: "reply", confidence: 0.9, reason: "open question", complexity: "simple" });
   });
   it("rejects invalid actions", () => {
     expect(() => parseTriageDecision('{"action":"shout","confidence":1,"reason":""}')).toThrow();

@@ -8,6 +8,9 @@ const bool = z
   .enum(["true", "false", "1", "0"])
   .transform((v) => v === "true" || v === "1");
 
+/** Optional string: unset and "" both mean "not configured". */
+const optionalString = z.preprocess((v) => (v === "" ? undefined : v), z.string().optional());
+
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
@@ -19,6 +22,15 @@ const schema = z.object({
   LLM_MODEL_AGENT: z.string().min(1),
   /** Small, cheap model for ambient triage ("should I speak?"). */
   LLM_MODEL_TRIAGE: z.string().min(1),
+  /**
+   * Optional strong model for hard tasks. When set, the agent model can hand a task over via the `escalate` tool,
+   * triage can route complex questions to it, and people can force it with "!deep <question>".
+   */
+  LLM_MODEL_HEAVY: optionalString,
+  /** Max heavy-model runs per channel per day. */
+  HEAVY_DAILY_LIMIT: z.coerce.number().int().min(0).default(20),
+  /** Tool-call rounds for heavy runs, which tend to be longer. */
+  AGENT_MAX_STEPS_HEAVY: z.coerce.number().int().min(1).max(100).default(16),
   /** "requesty" attaches channel/trace metadata in Requesty's format; "none" sends plain OpenAI requests. */
   LLM_METADATA_STYLE: z.enum(["requesty", "none"]).default("requesty"),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
@@ -29,13 +41,13 @@ const schema = z.object({
   LLM_STRUCTURED_OUTPUT: z.enum(["none", "json_object", "json_schema"]).default("none"),
 
   // --- Slack (enabled when both tokens are set) ---
-  SLACK_BOT_TOKEN: z.string().optional(),
-  SLACK_APP_TOKEN: z.string().optional(),
+  SLACK_BOT_TOKEN: optionalString,
+  SLACK_APP_TOKEN: optionalString,
 
   // --- Microsoft Teams (phase 3; not implemented yet) ---
-  TEAMS_APP_ID: z.string().optional(),
-  TEAMS_APP_PASSWORD: z.string().optional(),
-  TEAMS_TENANT_ID: z.string().optional(),
+  TEAMS_APP_ID: optionalString,
+  TEAMS_APP_PASSWORD: optionalString,
+  TEAMS_TENANT_ID: optionalString,
 
   // --- Behaviour ---
   BOT_NAME: z.string().default("Heinzel"),

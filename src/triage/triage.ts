@@ -14,10 +14,12 @@ export const triageDecisionSchema = z.object({
   reason: z.string().max(500).default(""),
   memory: z.string().max(1000).optional(),
   follow_up_hours: z.number().min(0.25).max(336).optional(),
+  /** Only meaningful for "reply": "complex" routes the answer to the heavy model when one is configured. */
+  complexity: z.enum(["simple", "complex"]).default("simple"),
 });
 export type TriageDecision = z.infer<typeof triageDecisionSchema>;
 
-export const IGNORE: TriageDecision = { action: "ignore", confidence: 1, reason: "pre-filter" };
+export const IGNORE: TriageDecision = { action: "ignore", confidence: 1, reason: "pre-filter", complexity: "simple" };
 
 const triageJsonSchema: Record<string, unknown> = {
   type: "object",
@@ -27,8 +29,9 @@ const triageJsonSchema: Record<string, unknown> = {
     reason: { type: "string" },
     memory: { type: "string" },
     follow_up_hours: { type: "number" },
+    complexity: { type: "string", enum: ["simple", "complex"] },
   },
-  required: ["action", "confidence", "reason", "memory", "follow_up_hours"],
+  required: ["action", "confidence", "reason", "memory", "follow_up_hours", "complexity"],
   additionalProperties: false,
 };
 
@@ -66,7 +69,9 @@ export function buildTriagePrompt(t: TriageInput): { system: string; user: strin
     t.botInThread ? `${t.botName} already took part in this thread, so a direct follow-up question to it is likely meant for it.` : "",
     t.channelInstructions.trim() ? `\nStanding instructions for this channel:\n${t.channelInstructions.trim()}` : "",
     "",
-    'Answer with one JSON object only: {"action": ..., "confidence": 0..1, "reason": "...", "memory": "...", "follow_up_hours": number}.',
+    'For "reply", set "complexity" to "complex" if a good answer needs deep reasoning (multi-step analysis, non-trivial code, careful trade-offs), otherwise "simple".',
+    "",
+    'Answer with one JSON object only: {"action": ..., "confidence": 0..1, "reason": "...", "memory": "...", "follow_up_hours": number, "complexity": "simple"|"complex"}.',
     'Use "" for memory and 0 for follow_up_hours when they do not apply.',
   ]
     .filter((l) => l !== "")
@@ -108,7 +113,7 @@ export async function triageMessage(
     return parseTriageDecision(res.content ?? "");
   } catch {
     // Unparseable output is treated as "do nothing" rather than retried: triage must never cause noise.
-    return { action: "ignore", confidence: 0, reason: "unparseable triage output" };
+    return { action: "ignore", confidence: 0, reason: "unparseable triage output", complexity: "simple" };
   }
 }
 

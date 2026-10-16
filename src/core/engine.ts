@@ -2,14 +2,14 @@ import type { Logger } from "pino";
 import type { Config } from "../config.js";
 import { buildSystemPrompt, finalInstruction, renderTranscript, type RespondMode } from "../agent/prompt.js";
 import { isSilent, runAgent } from "../agent/runner.js";
-import { defaultTools, followupDedupeKey, memoryScopes, type AgentTool, type ToolContext } from "../agent/tools.js";
+import { defaultTools, escalateTool, followupDedupeKey, memoryScopes, type AgentTool, type ToolContext } from "../agent/tools.js";
 import type { LlmClient } from "../llm/client.js";
 import type { Memory, MemoryStore } from "../memory/memory.js";
 import type { JobHandlers } from "../queue/worker.js";
 import type { JobPayloads, JobQueue } from "../queue/queue.js";
 import { checkSpeakBudget, preFilter, triageMessage } from "../triage/triage.js";
 import type { BotPostKind, ChannelSettings, Store, StoredEvent } from "../store/store.js";
-import { helpText, parseCommand, stripLeadingMentions, type Command } from "./commands.js";
+import { cleanForPrompt, helpText, parseCommand, type Command } from "./commands.js";
 import { parseChannelKey, type ChatAdapter, type ChatEvent, type Platform } from "./types.js";
 
 export interface EngineDeps {
@@ -108,6 +108,7 @@ export class Engine {
       focus: ev,
       toolContext: this.toolContext(ev.channelKey, ev.threadId, `${ev.platform}:${ev.userId}`, ev.id),
       traceId: `event-${ev.id}`,
+      tier: p.tier ?? "default",
     });
 
     if (isSilent(text)) {
@@ -147,10 +148,13 @@ export class Engine {
         message: ev,
       },
       { channelKey: ev.channelKey, purpose: "triage", traceId: `event-${ev.id}` },
-      (u) => this.recordUsage(ev.channelKey, "triage", config.LLM_MODEL_TRIAGE, u),
+      (u) => this.recordUsage(ev.channelKey, "triage", config.LLM_MODEL_TRIAGE, u, `event-${ev.id}`),
     );
     const dlog = log.child({ channel: ev.channelKey, event: ev.id });
-    dlog.info({ action: decision.action, confidence: decision.confidence, reason: decision.reason }, "triage decision");
+    dlog.info(
+      { action: decision.action, confidence: decision.confidence, complexity: decision.complexity, reason: decision.reason },
+      "triage decision",
+    );
 
     switch (decision.action) {
       case "ignore":
@@ -179,7 +183,12 @@ export class Engine {
             return;
           }
         }
-        await queue.enqueue("respond", { eventId: ev.id, mode: p.botInThread ? "thread" : "ambient", reason: decision.reason });
+        await queue.enqueue("respond", {
+          eventId: ev.id,
+          mode: p.botInThread ? "thread" : "ambient",
+          reason: decision.reason,
+          tier: decision.complexity === "complex" ? "heavy" : "default",
+        });
         return;
       }
     }
@@ -219,6 +228,10 @@ export class Engine {
     const { store, memory, config } = this.d;
     let reply: string;
     switch (cmd.kind) {
+      case "deep":
+        await this.adapter(ev.platform).acknowledge?.(ev.channelId, ev.messageId).catch(() => {});
+        await this.d.queue.enqueue("respond", { eventId: ev.id, mode: "direct", tier: "heavy", reason: "the person explicitly asked for the stronger model" });
+        return;
       case "help":
         reply = helpText(config.BOT_NAME);
         break;
@@ -231,6 +244,9 @@ export class Engine {
           `Ambient mode: ${channel.ambientEnabled ? "on" : "off"}`,
           `Unprompted posts (24h): ${posted}/${limit}`,
           `LLM calls (24h): ${usage.calls} · tokens in/out: ${usage.promptTokens}/${usage.completionTokens}`,
+          config.LLM_MODEL_HEAVY
+            ? `Heavy model runs (24h): ${await store.heavyRunsLast24h(channel.channelKey)}/${config.HEAVY_DAILY_LIMIT}`
+            : "Heavy model: not configured",
           `Instructions: ${channel.instructions ? "set (`!instructions` to show)" : "none"}`,
         ].join("\n");
         break;
@@ -322,43 +338,70 @@ export class Engine {
     focus: ChatEvent | null;
     toolContext: ToolContext;
     traceId: string;
+    tier?: "default" | "heavy";
   }): Promise<string> {
-    const { config, llm, memory, log } = this.d;
+    const { config, memory, log } = this.d;
     const query = [a.focus?.text ?? "", a.reason ?? ""].join(" ");
     const recalled = await memory.search({ scopes: memoryScopes(a.toolContext), text: query, limit: 8 });
     const recent = await memory.search({ scopes: memoryScopes(a.toolContext), limit: 5 });
     const memories = dedupeMemories([...recalled, ...recent]);
-
-    const system = buildSystemPrompt({
-      botName: config.BOT_NAME,
-      platform: a.channel.platform,
-      channelName: a.channel.name,
-      isDirect: a.focus?.isDirect ?? false,
-      channelInstructions: a.channel.instructions,
-      mode: a.mode,
-      reason: a.reason,
-      memories,
-      now: this.now(),
-    });
-    const transcript = a.transcript.map((e) => ({ ...e, text: e.isSelf ? e.text : stripLeadingMentions(e.text) || e.text }));
+    const transcript = a.transcript.map((e) => ({ ...e, text: e.isSelf ? e.text : cleanForPrompt(e.text) }));
     const user = `${renderTranscript(transcript, config.BOT_NAME, a.focus?.messageId)}\n\n${finalInstruction(a.mode, a.focus)}`;
+    const heavyAllowed = await this.heavyAllowed(a.channel.channelKey);
+    const rlog = log.child({ channel: a.channel.channelKey, trace: a.traceId });
 
-    const result = await runAgent(
-      llm,
-      {
-        model: config.LLM_MODEL_AGENT,
-        system,
-        messages: [{ role: "user", content: user }],
-        tools: this.tools,
-        toolContext: a.toolContext,
-        maxSteps: config.AGENT_MAX_STEPS,
-        meta: { channelKey: a.channel.channelKey, purpose: "agent", traceId: a.traceId },
-        onUsage: (u) => this.recordUsage(a.channel.channelKey, "agent", u.model, u),
-      },
-      log.child({ channel: a.channel.channelKey, trace: a.traceId }),
-    );
-    log.debug({ channel: a.channel.channelKey, steps: result.steps, tools: result.toolCalls }, "agent run finished");
-    return result.text;
+    const run = async (heavy: { reason: string } | null): Promise<{ text: string; escalation?: { reason: string } }> => {
+      const canEscalate = !heavy && heavyAllowed;
+      const system = buildSystemPrompt({
+        botName: config.BOT_NAME,
+        platform: a.channel.platform,
+        channelName: a.channel.name,
+        isDirect: a.focus?.isDirect ?? false,
+        channelInstructions: a.channel.instructions,
+        mode: a.mode,
+        reason: a.reason,
+        memories,
+        now: this.now(),
+        canEscalate,
+        heavy: heavy ?? undefined,
+      });
+      const model = heavy ? config.LLM_MODEL_HEAVY! : config.LLM_MODEL_AGENT;
+      const purpose = heavy ? "agent_heavy" : "agent";
+      const traceId = heavy ? `${a.traceId}-heavy` : a.traceId;
+      const result = await runAgent(
+        this.d.llm,
+        {
+          model,
+          system,
+          messages: [{ role: "user", content: user }],
+          tools: canEscalate ? [...this.tools, escalateTool as AgentTool] : this.tools,
+          toolContext: a.toolContext,
+          maxSteps: heavy ? config.AGENT_MAX_STEPS_HEAVY : config.AGENT_MAX_STEPS,
+          meta: { channelKey: a.channel.channelKey, purpose, traceId },
+          onUsage: (u) => this.recordUsage(a.channel.channelKey, purpose, u.model, u, traceId),
+        },
+        rlog,
+      );
+      rlog.debug({ model, steps: result.steps, tools: result.toolCalls, escalated: !!result.escalation }, "agent run finished");
+      return result;
+    };
+
+    if (a.tier === "heavy" && heavyAllowed) {
+      return (await run({ reason: a.reason ?? "routed to the stronger model" })).text;
+    }
+    if (a.tier === "heavy") rlog.info("heavy model requested but not configured or over budget; using default model");
+
+    const first = await run(null);
+    if (!first.escalation) return first.text;
+    rlog.info({ reason: first.escalation.reason }, "escalating to heavy model");
+    return (await run(first.escalation)).text;
+  }
+
+  /** Heavy model configured and the channel is within its daily heavy-run budget. */
+  private async heavyAllowed(key: string): Promise<boolean> {
+    const { config, store } = this.d;
+    if (!config.LLM_MODEL_HEAVY || config.HEAVY_DAILY_LIMIT <= 0) return false;
+    return (await store.heavyRunsLast24h(key)) < config.HEAVY_DAILY_LIMIT;
   }
 
   /** Sends a message and records it. Failures after sending are logged, never rethrown, so a job retry can't double-post. */
@@ -389,9 +432,15 @@ export class Engine {
     }
   }
 
-  private async recordUsage(key: string, purpose: string, model: string, u: { promptTokens: number; completionTokens: number }): Promise<void> {
+  private async recordUsage(
+    key: string,
+    purpose: string,
+    model: string,
+    u: { promptTokens: number; completionTokens: number },
+    traceId?: string,
+  ): Promise<void> {
     await this.d.store
-      .recordUsage({ channelKey: key, purpose, model, promptTokens: u.promptTokens, completionTokens: u.completionTokens })
+      .recordUsage({ channelKey: key, purpose, model, promptTokens: u.promptTokens, completionTokens: u.completionTokens, traceId })
       .catch((err) => this.d.log.warn({ err }, "failed to record usage"));
   }
 }

@@ -203,3 +203,102 @@ describe.skipIf(!TEST_DATABASE_URL)("engine", () => {
     expect(await drain(queue, engine.handlers())).toBe(0);
   });
 });
+
+describe.skipIf(!TEST_DATABASE_URL)("engine: heavy model", () => {
+  let db: Db;
+  let adapter: FakeAdapter;
+  let llm: FakeLlm;
+  let queue: JobQueue;
+  let respond: (req: LlmRequest, n: number) => LlmResponse;
+
+  const make = (overrides: Record<string, string> = {}) =>
+    new Engine({
+      config: testConfig({ LLM_MODEL_HEAVY: "heavy-model", HEAVY_DAILY_LIMIT: "1", ...overrides }),
+      store: new Store(db),
+      memory: new MemoryStore(db),
+      queue,
+      llm,
+      adapters: new Map<Platform, typeof adapter>([["slack", adapter]]),
+      log: silentLog,
+    });
+
+  beforeAll(async () => {
+    db = await freshDb();
+  });
+  afterAll(async () => {
+    await db?.end();
+  });
+  beforeEach(async () => {
+    await db.query("TRUNCATE channels, events, jobs, memories, bot_posts, llm_usage RESTART IDENTITY CASCADE");
+    adapter = new FakeAdapter();
+    respond = () => reply("ok");
+    llm = new FakeLlm((req, n) => respond(req, n));
+    queue = new JobQueue(db);
+  });
+
+  const toolNames = (req: LlmRequest) => (req.tools ?? []).map((t) => (t.type === "function" ? t.function.name : ""));
+
+  it("lets the agent escalate to the heavy model, once per budget", async () => {
+    const engine = make();
+    respond = (req) =>
+      req.model === "agent-model"
+        ? toolNames(req).includes("escalate")
+          ? reply("", [{ id: "e", name: "escalate", arguments: '{"reason":"needs a migration plan"}' }])
+          : reply("default answer")
+        : reply("heavy answer");
+
+    await engine.handleIncoming(msg({ text: "@Heinzel plan the Postgres 16 → 17 migration", mentionsBot: true }));
+    await drain(queue, engine.handlers());
+    expect(adapter.sent.map((s) => s.text)).toEqual(["heavy answer"]);
+    const heavyReq = llm.byModel("heavy-model")[0]!;
+    expect(toolNames(heavyReq)).not.toContain("escalate");
+    expect(String(heavyReq.messages[0]!.content)).toContain("needs a migration plan");
+    expect(heavyReq.meta).toMatchObject({ purpose: "agent_heavy" });
+
+    // Budget of 1 heavy run per day is used up: escalate is no longer offered.
+    await engine.handleIncoming(msg({ text: "@Heinzel and the rollback plan?", mentionsBot: true }));
+    await drain(queue, engine.handlers());
+    expect(adapter.sent.map((s) => s.text)).toEqual(["heavy answer", "default answer"]);
+    expect(llm.byModel("heavy-model")).toHaveLength(1);
+  });
+
+  it("routes !deep straight to the heavy model and strips the prefix", async () => {
+    const engine = make();
+    respond = (req) => reply(req.model === "heavy-model" ? "deep answer" : "shallow");
+    const m = msg({ text: "@Heinzel !deep compare event sourcing and CRUD for billing", mentionsBot: true });
+    adapter.history.push(m);
+    await engine.handleIncoming(m);
+    expect(adapter.acks).toEqual([m.messageId]);
+    await drain(queue, engine.handlers());
+    expect(adapter.sent.map((s) => s.text)).toEqual(["deep answer"]);
+    expect(llm.byModel("agent-model")).toHaveLength(0);
+    const transcript = JSON.stringify(llm.byModel("heavy-model")[0]!.messages);
+    expect(transcript).toContain("Anna: compare event sourcing and CRUD for billing");
+    expect(transcript).not.toContain("!deep");
+  });
+
+  it("routes complex ambient questions to the heavy model via triage", async () => {
+    const engine = make();
+    await engine.handleIncoming(msg({ text: "@Heinzel !ambient on", mentionsBot: true }));
+    respond = (req) =>
+      req.model === "triage-model"
+        ? triage({ action: "reply", confidence: 0.9, complexity: "complex", reason: "architecture question" })
+        : reply(req.model === "heavy-model" ? "thorough answer" : "quick answer");
+    await engine.handleIncoming(msg({ text: "Should we split the monolith's billing module into its own service?" }));
+    await drain(queue, engine.handlers());
+    expect(adapter.sent.at(-1)?.text).toBe("thorough answer");
+  });
+
+  it("offers no escalation and ignores !deep routing when no heavy model is configured", async () => {
+    const engine = make({ LLM_MODEL_HEAVY: "" });
+    respond = () => reply("default answer");
+    await engine.handleIncoming(msg({ text: "@Heinzel !deep hard question", mentionsBot: true }));
+    await engine.handleIncoming(msg({ text: "@Heinzel another question", mentionsBot: true }));
+    await drain(queue, engine.handlers());
+    expect(adapter.sent.map((s) => s.text)).toEqual(["default answer", "default answer"]);
+    for (const req of llm.requests) {
+      expect(req.model).toBe("agent-model");
+      expect(toolNames(req)).not.toContain("escalate");
+    }
+  });
+});

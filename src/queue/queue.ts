@@ -3,7 +3,7 @@ import type { Db } from "../db/pool.js";
 /** Job kinds and their payloads. Extend here when adding a new kind of background work. */
 export interface JobPayloads {
   /** Heinzel was addressed (or triage decided to speak): produce a reply in the thread. */
-  respond: { eventId: number; mode: "direct" | "ambient" | "thread"; reason?: string };
+  respond: { eventId: number; mode: "direct" | "ambient" | "thread"; reason?: string; tier?: "default" | "heavy" };
   /** A message Heinzel was not addressed in: decide whether to ignore, remember, speak or follow up. */
   triage: { eventId: number; botInThread: boolean };
   /** Check back on a thread that may have gone quiet. */

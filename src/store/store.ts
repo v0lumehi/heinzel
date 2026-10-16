@@ -153,11 +153,28 @@ export class Store {
 
   // ---------- usage ----------
 
-  async recordUsage(u: { channelKey: string | null; purpose: string; model: string; promptTokens: number; completionTokens: number }): Promise<void> {
+  async recordUsage(u: {
+    channelKey: string | null;
+    purpose: string;
+    model: string;
+    promptTokens: number;
+    completionTokens: number;
+    traceId?: string;
+  }): Promise<void> {
     await this.db.query(
-      `INSERT INTO llm_usage (channel_key, purpose, model, prompt_tokens, completion_tokens) VALUES ($1,$2,$3,$4,$5)`,
-      [u.channelKey, u.purpose, u.model, u.promptTokens, u.completionTokens],
+      `INSERT INTO llm_usage (channel_key, purpose, model, prompt_tokens, completion_tokens, trace_id) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [u.channelKey, u.purpose, u.model, u.promptTokens, u.completionTokens, u.traceId ?? null],
     );
+  }
+
+  /** Number of distinct heavy-model agent runs in the channel during the last 24 hours. */
+  async heavyRunsLast24h(key: string): Promise<number> {
+    const { rows } = await this.db.query<{ n: string }>(
+      `SELECT count(DISTINCT COALESCE(trace_id, id::text)) AS n FROM llm_usage
+       WHERE channel_key = $1 AND purpose = 'agent_heavy' AND created_at > now() - interval '24 hours'`,
+      [key],
+    );
+    return Number(rows[0]?.n ?? 0);
   }
 
   async usageLast24h(key: string): Promise<{ calls: number; promptTokens: number; completionTokens: number }> {

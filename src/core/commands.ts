@@ -12,11 +12,18 @@ export type Command =
   | { kind: "instructions-set"; text: string }
   | { kind: "instructions-clear" }
   | { kind: "memories"; query: string }
+  | { kind: "deep"; text: string }
   | { kind: "unknown"; raw: string };
 
 /** Removes leading mentions like "@Heinzel" so commands and prompts see only the actual message. */
 export function stripLeadingMentions(text: string): string {
   return text.replace(/^(\s*@[\p{L}\p{N}._-]+[,:]?\s*)+/u, "").trim();
+}
+
+/** Message text as the model should see it: no leading mentions, no "!deep" routing prefix. */
+export function cleanForPrompt(text: string): string {
+  const t = stripLeadingMentions(text);
+  return (t.replace(/^!(deep|think)\s+/i, "") || text).trim();
 }
 
 export function parseCommand(text: string): Command | null {
@@ -49,6 +56,9 @@ export function parseCommand(text: string): Command | null {
     case "memories":
     case "memory":
       return { kind: "memories", query: arg };
+    case "deep":
+    case "think":
+      return arg ? { kind: "deep", text: arg } : { kind: "unknown", raw: t };
     default:
       return { kind: "unknown", raw: t };
   }
@@ -62,5 +72,6 @@ export function helpText(botName: string): string {
     "`!limit <n>|default` – max unprompted posts per day here",
     "`!instructions <text>` – standing instructions for this channel (`!instructions` shows, `!instructions clear` removes)",
     "`!memories [query]` – what I remember about this channel",
+    "`!deep <question>` – answer with the stronger model right away",
   ].join("\n");
 }

@@ -4,7 +4,7 @@ Start here when you pick up work on Heinzel. Read `docs/ARCHITECTURE.md` for the
 
 ## Current state
 
-- MVP complete for Slack; 41 tests green (unit + Postgres integration).
+- MVP complete for Slack; 42 tests green (unit + Postgres integration).
 - The Dockerfile has not been built yet (no Docker daemon in the build environment) — verify `docker compose --profile app up --build` once.
 - Not yet run against a live Slack workspace or Requesty — that is the next step (ROADMAP §1).
 - Teams adapter not started (ROADMAP §2, detailed plan there).
@@ -47,4 +47,5 @@ git config user.email "aljic.zijad@gmail.com"
 
 Append a short entry when you stop, so the next person or agent can continue.
 
+- **2026-10-17** — Apache-2.0 license (personal project). Configurable event retention (`EVENTS_RETENTION_DAYS`, default keep); policy still open.
 - **2026-10-17** — Initial build. Slack MVP, ambient triage, follow-ups, memory, heavy-model escalation, tests, docs. Next: live test (ROADMAP §1), then Teams adapter (ROADMAP §2).

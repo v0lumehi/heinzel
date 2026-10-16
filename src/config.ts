@@ -62,6 +62,11 @@ const schema = z.object({
   AMBIENT_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.75),
   /** How many prior messages of a thread/channel go into the agent's context. */
   CONTEXT_MESSAGES: z.coerce.number().int().min(1).max(200).default(30),
+  /**
+   * Days to keep stored message copies (events). 0 = keep forever (default until a retention policy is decided).
+   * Memories survive; they just lose the link to their source message.
+   */
+  EVENTS_RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
   /** Hard cap on tool-call rounds per agent run. */
   AGENT_MAX_STEPS: z.coerce.number().int().min(1).max(50).default(8),
 });

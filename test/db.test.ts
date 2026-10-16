@@ -75,6 +75,25 @@ describe.skipIf(!TEST_DATABASE_URL)("database", () => {
     expect((await s.ensureChannel("slack", "C1", undefined, false)).ambientEnabled).toBe(true); // existing settings survive
   });
 
+  it("housekeeping: prunes old events only when retention is set, and old finished jobs", async () => {
+    const s = new Store(db);
+    const m = new MemoryStore(db);
+    await s.ensureChannel("slack", "CR", "retention", false);
+    const old = (await s.insertEvent(msg({ channelId: "CR", messageId: "old", sentAt: new Date(Date.now() - 40 * 86_400_000) })))!;
+    await s.insertEvent(msg({ channelId: "CR", messageId: "new" }));
+    const mem = await m.add({ scope: "channel", scopeKey: "slack:CR", content: "Old but important fact.", createdBy: "agent", sourceEvent: old.id });
+    await db.query(`INSERT INTO jobs (kind, payload, status, finished_at) VALUES ('triage', '{}', 'done', now() - interval '8 days')`);
+
+    const keepAll = await s.pruneOldData(0);
+    expect(keepAll.events).toBe(0);
+    expect(keepAll.jobs).toBeGreaterThanOrEqual(1); // finished jobs are pruned regardless of event retention
+    expect((await s.pruneOldData(30)).events).toBe(1);
+    const left = await db.query(`SELECT message_ref FROM events WHERE channel_key = 'slack:CR'`);
+    expect(left.rows).toEqual([{ message_ref: "new" }]);
+    const kept = await db.query(`SELECT source_event FROM memories WHERE id = $1`, [mem.id]);
+    expect(kept.rows).toEqual([{ source_event: null }]);
+  });
+
   it("memory: scoped full-text recall, dedupe and forget", async () => {
     const m = new MemoryStore(db);
     const a = await m.add({ scope: "channel", scopeKey: "slack:C1", content: "Deployments go through ArgoCD, owner is Team Opal.", createdBy: "agent" });

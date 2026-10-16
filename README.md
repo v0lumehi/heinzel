@@ -89,4 +89,4 @@ The test database is wiped on every run — never point `TEST_DATABASE_URL` at r
 
 ## License
 
-Not decided yet (see [docs/ROADMAP.md](docs/ROADMAP.md)).
+Copyright 2026 v0lumehi. Licensed under the [Apache License 2.0](LICENSE).

@@ -45,9 +45,7 @@ Implement `ChatAdapter` with the Microsoft Teams SDK for TypeScript (`@microsoft
 
 ## Open decisions
 
-- **License** — not chosen yet. Apache-2.0 is common for this kind of project. Clarify IP/ownership first if it is built on company time.
-- **Where the repo lives long-term** — personal account vs. company organisation.
-- **Data retention** — how long to keep `events` (message copies). Add a retention job once decided.
+- **Data retention** — not decided yet. Message copies (`events`) are kept forever by default; set `EVENTS_RETENTION_DAYS` once a policy exists. Memories are kept independently of events.
 
 ## Known limitations
 

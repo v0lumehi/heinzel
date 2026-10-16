@@ -151,6 +151,24 @@ export class Store {
     return rows[0]?.created_at ?? null;
   }
 
+  // ---------- housekeeping ----------
+
+  /**
+   * Deletes message copies older than `eventRetentionDays` (0 = keep) and finished jobs older than 7 days.
+   * Returns the number of deleted rows per table.
+   */
+  async pruneOldData(eventRetentionDays: number): Promise<{ events: number; jobs: number }> {
+    let events = 0;
+    if (eventRetentionDays > 0) {
+      const res = await this.db.query(`DELETE FROM events WHERE sent_at < now() - make_interval(days => $1)`, [eventRetentionDays]);
+      events = res.rowCount ?? 0;
+    }
+    const jobs = await this.db.query(
+      `DELETE FROM jobs WHERE status IN ('done', 'failed') AND finished_at < now() - interval '7 days'`,
+    );
+    return { events, jobs: jobs.rowCount ?? 0 };
+  }
+
   // ---------- usage ----------
 
   async recordUsage(u: {

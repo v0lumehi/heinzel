@@ -68,6 +68,17 @@ for (const adapter of adapters.values()) {
 }
 log.info({ platforms: [...adapters.keys()], agentModel: config.LLM_MODEL_AGENT, triageModel: config.LLM_MODEL_TRIAGE }, `${config.BOT_NAME} is running`);
 
+async function housekeeping(): Promise<void> {
+  try {
+    const pruned = await store.pruneOldData(config.EVENTS_RETENTION_DAYS);
+    if (pruned.events || pruned.jobs) log.info(pruned, "pruned old data");
+  } catch (err) {
+    log.warn({ err }, "housekeeping failed");
+  }
+}
+await housekeeping();
+setInterval(() => void housekeeping(), 6 * 3_600_000).unref();
+
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;

@@ -82,12 +82,12 @@ export function slackToPlainText(text: string, userNames: Map<string, string>): 
  * Converts the light markdown the model writes into Slack mrkdwn.
  * Code spans and blocks are left untouched.
  */
-export function markdownToMrkdwn(md: string): string {
+export function markdownToMrkdwn(md: string, resolveMention?: (name: string) => string | undefined): string {
   const parts = md.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
   return parts
     .map((part, i) => {
       if (i % 2 === 1) return part; // code
-      return part
+      const converted = part
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -97,6 +97,13 @@ export function markdownToMrkdwn(md: string): string {
         .replace(/~~(.+?)~~/g, "~$1~")
         .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "<$2|$1>")
         .replace(/^(\s*)[-*]\s+/gm, "$1• ");
+      if (!resolveMention) return converted;
+      // "@Anna" → "<@U123>" so the person actually gets notified. Unknown names stay as written.
+      return converted.replace(/(^|[\s(])@([\p{L}\p{N}._-]+)/gu, (m, pre: string, raw: string) => {
+        const name = raw.replace(/[._-]+$/, ""); // "@Anna." at the end of a sentence
+        const id = resolveMention(name);
+        return id ? `${pre}<@${id}>${raw.slice(name.length)}` : m;
+      });
     })
     .join("");
 }

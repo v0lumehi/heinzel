@@ -46,6 +46,12 @@ describe("markdownToMrkdwn", () => {
     expect(out).toBe("*Title*\n*bold* and <https://x.dev|docs>\n• item\n`**not bold**`\n```\n<raw>\n```");
   });
 
+  it("turns known @names into real mentions outside code", () => {
+    const ids: Record<string, string> = { anna: "U1" };
+    const out = markdownToMrkdwn("@Anna did it land? (cc @bob) `@Anna` mail@anna.dev thanks @Anna.", (n) => ids[n.toLowerCase()]);
+    expect(out).toBe("<@U1> did it land? (cc @bob) `@Anna` mail@anna.dev thanks <@U1>.");
+  });
+
   it("escapes control characters outside code", () => {
     expect(markdownToMrkdwn("a < b & c > d")).toBe("a &lt; b &amp; c &gt; d");
   });

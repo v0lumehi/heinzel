@@ -4,7 +4,8 @@ Start here when you pick up work on Heinzel. Read `docs/ARCHITECTURE.md` for the
 
 ## Current state
 
-- MVP complete for Slack; 40 tests green (unit + Postgres integration).
+- MVP complete for Slack; 41 tests green (unit + Postgres integration).
+- The Dockerfile has not been built yet (no Docker daemon in the build environment) — verify `docker compose --profile app up --build` once.
 - Not yet run against a live Slack workspace or Requesty — that is the next step (ROADMAP §1).
 - Teams adapter not started (ROADMAP §2, detailed plan there).
 

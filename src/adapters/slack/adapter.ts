@@ -72,7 +72,7 @@ export class SlackAdapter implements ChatAdapter {
   async send(m: OutboundMessage): Promise<SentMessage> {
     const res = await this.app.client.chat.postMessage({
       channel: m.channelId,
-      text: markdownToMrkdwn(m.text),
+      text: markdownToMrkdwn(m.text, (name) => this.userIdByName(name)),
       ...(m.threadId ? { thread_ts: m.threadId } : {}),
       unfurl_links: false,
     });
@@ -121,6 +121,15 @@ export class SlackAdapter implements ChatAdapter {
       channelName: base.isDirect ? undefined : await this.channelName(base.channelId),
       text: slackToPlainText(m.text ?? "", this.userNames),
     };
+  }
+
+  /** Reverse lookup over users seen so far (display name without spaces, case-insensitive). Never resolves Heinzel itself. */
+  private userIdByName(name: string): string | undefined {
+    const wanted = name.toLowerCase();
+    for (const [id, n] of this.userNames) {
+      if (id !== this.me?.botUserId && n.replace(/\s+/g, "").toLowerCase() === wanted) return id;
+    }
+    return undefined;
   }
 
   private async userName(id: string): Promise<void> {

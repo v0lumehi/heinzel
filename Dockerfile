@@ -1,4 +1,4 @@
-FROM node:22-slim AS build
+FROM node:25-slim AS build
 WORKDIR /app
 ENV CI=true
 RUN corepack enable
@@ -10,7 +10,7 @@ COPY src ./src
 COPY web ./web
 RUN pnpm build && pnpm prune --prod
 
-FROM node:22-slim
+FROM node:25-slim
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules

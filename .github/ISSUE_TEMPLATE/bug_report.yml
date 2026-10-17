@@ -1,0 +1,45 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please do not include secrets, tokens or message contents from your organisation. Security issues go to SECURITY.md, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Set AMBIENT_DEFAULT=true\n2. Write … in a channel\n3. …"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Heinzel version
+      description: Image tag, chart version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Chat platform
+      multiple: true
+      options: [Slack, Microsoft Teams, Agents Playground, not related]
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run it?
+      options: [Helm / Kubernetes, Docker Compose, pnpm dev, other]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: Remove anything confidential first.
+      render: text

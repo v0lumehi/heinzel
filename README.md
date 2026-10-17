@@ -1,106 +1,122 @@
-# Heinzel
+<p align="center">
+  <img src="docs/assets/logo.svg" width="72" height="72" alt="">
+</p>
 
-An open-source, self-hosted AI teammate for team chat. Tag `@Heinzel` and it works in the thread — or let it follow a channel and speak up on its own when it can clearly help.
+<h1 align="center">Heinzel</h1>
 
-- **Chat-platform agnostic.** Slack and Microsoft Teams. Everything below the adapters is platform-neutral.
-- **LLM-gateway agnostic.** Any OpenAI-compatible endpoint. Defaults to the [Requesty](https://requesty.ai) EU gateway (Frankfurt) and tags every call with channel metadata for cost tracking.
-- **Proactive, but polite.** Ambient mode is off by default and per channel. A cheap triage model decides whether to speak; hard budgets and cooldowns cap unprompted posts.
-- **Right model for the job.** A small model triages, a mid-size model does the work, and an optional strong model takes over hard tasks.
-- **Team memory.** Remembers decisions, owners and conventions per channel, company-wide and per person — in your own Postgres.
-- **Tools.** Reads web pages out of the box; self-hosted web search (SearXNG), GitLab, Jira and any other [MCP](https://modelcontextprotocol.io) server via a config file. See [docs/TOOLS.md](docs/TOOLS.md).
-- **Coding sessions.** Hand a coding task to OpenCode in an isolated container in your infrastructure; it opens a draft merge request. See [docs/CODING.md](docs/CODING.md).
-- **Admin UI.** Channel settings, team memory, usage, coding sessions and an audit log, with single sign-on (Entra ID or any OIDC provider). See [docs/ADMIN.md](docs/ADMIN.md).
-- **Self-hosted.** One Node process plus Postgres. No vendor cloud in the middle.
+<p align="center">
+  <strong>A self-hosted AI teammate for Slack and Microsoft Teams.</strong><br>
+  Tag it and it works in the thread. Or let it follow a channel and speak up on its own when it can clearly help.
+</p>
 
-> Status: early MVP. Slack works end to end; Teams works in the Agents Playground, a real tenant is next ([docs/TEAMS.md](docs/TEAMS.md)). See [docs/ROADMAP.md](docs/ROADMAP.md).
+<p align="center">
+  <a href="https://github.com/v0lumehi/heinzel/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/v0lumehi/heinzel/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://codecov.io/gh/v0lumehi/heinzel"><img alt="Coverage" src="https://codecov.io/gh/v0lumehi/heinzel/graph/badge.svg"></a>
+  <a href="https://github.com/v0lumehi/heinzel/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/v0lumehi/heinzel/actions/workflows/codeql.yml/badge.svg?branch=main"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/v0lumehi/heinzel"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/v0lumehi/heinzel/badge"></a>
+  <a href="https://github.com/v0lumehi/heinzel/releases"><img alt="Release" src="https://img.shields.io/github/v/release/v0lumehi/heinzel?include_prereleases&sort=semver"></a>
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/github/license/v0lumehi/heinzel"></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/DEPLOYMENT.md">Deployment</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+---
+
+## Why Heinzel
+
+- **Your infrastructure, your data.** One container plus Postgres. Messages, memories and settings stay in your database; only the LLM call leaves, through the gateway you choose.
+- **Slack and Teams.** One product for both, so mixed or merging organisations get the same teammate everywhere.
+- **Proactive, but polite.** Ambient mode is off by default and set per channel. A small model decides whether to speak; budgets and cooldowns cap unprompted posts.
+- **Any model.** Any OpenAI-compatible gateway (defaults to the [Requesty](https://requesty.ai) EU gateway). A small model triages, a mid-size model answers, an optional strong model takes hard tasks.
+- **Team memory.** Remembers decisions, owners and conventions per channel, organisation-wide and per person.
+- **Your tools.** Web pages, self-hosted search (SearXNG), GitLab, Jira, Confluence and any other [MCP](https://modelcontextprotocol.io) server.
+- **Coding sessions.** Hands a task to a coding agent in an isolated container or Kubernetes Job in your infrastructure; the result is a draft merge request.
+- **Built for operations.** Admin UI with single sign-on, roles and audit log; Helm chart; signed multi-arch images with SBOM.
+
+> **Status:** early. Tested with a real Slack workspace and a Microsoft Teams test tenant; not yet run in production. See the [roadmap](docs/ROADMAP.md).
 
 ## How it behaves
 
 | Situation | What Heinzel does |
 |---|---|
-| Someone tags `@Heinzel` or DMs it | Reacts with 👀, reads the thread (or recent channel history), answers in the thread |
-| Someone replies in a thread Heinzel took part in | Triage decides whether the reply is meant for Heinzel; answers if so |
-| Ambient mode on, nobody tagged Heinzel | Triage decides: ignore (most of the time), remember a fact, schedule a follow-up, or speak up |
-| A question is open or someone promised something | Heinzel can schedule a follow-up and check back later |
-| A task is hard | The agent model hands over to the strong model (`escalate`), within a daily budget |
+| Someone tags `@Heinzel` or writes to it directly | Reacts with 👀, reads the thread (or recent history), answers in the thread |
+| Someone replies in a thread Heinzel took part in | Decides whether the reply is meant for it; answers if so |
+| Ambient mode is on and nobody tagged Heinzel | Mostly stays quiet; may remember a fact, schedule a follow-up, or speak up |
+| A question stays open or someone promises something | Schedules a follow-up and checks back later |
+| A task is hard | Hands over to the strong model, within a daily budget |
+| Someone asks for a code change | Proposes a coding session; it starts after the requester confirms with `!go` |
 
-### Which model runs when
+Chat commands (mention Heinzel first): `!status`, `!ambient on|off`, `!limit <n>`, `!instructions <text>`, `!memories [query]`, `!deep <question>`, `!go` / `!stop` / `!coding`, `!help`.
 
-| Model | Env var | Runs for | Recommended (Requesty EU) |
-|---|---|---|---|
-| Triage | `LLM_MODEL_TRIAGE` | Every unaddressed message in ambient channels and threads Heinzel is in | Claude Haiku 5.5 (Bedrock) |
-| Agent | `LLM_MODEL_AGENT` | Every answer: mentions, DMs, ambient replies, follow-ups | Claude Sonnet 5.5 (Bedrock) |
-| Heavy (optional) | `LLM_MODEL_HEAVY` | When the agent calls `escalate`, triage rates a question `complex`, or someone uses `!deep` | Claude Opus 5.5 (Bedrock) |
+## How it works
 
-EU-provider-only alternative: Mistral Small (triage) + Mistral Large 4 (agent). Copy exact model ids from your gateway's model library and restrict your Requesty organisation to EU-region models.
+```mermaid
+flowchart LR
+  Slack -- Socket Mode --> A[Adapters]
+  Teams -- HTTPS --> A
+  A --> E[Engine]
+  E <--> DB[(Postgres<br/>events · memory · jobs · settings)]
+  E --> W[Workers]
+  W -- triage · answer · follow-up --> LLM[LLM gateway]
+  W -- tools --> MCP[MCP servers<br/>GitLab · Jira · search]
+  W -- coding --> C[Coding container / Job] --> MR[Draft merge request]
+  Admin[Admin UI · SSO] --> DB
+```
 
-### Chat commands
+Every slow step runs as a job in Postgres, so work survives restarts and several replicas share the load. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Mention Heinzel, then:
+## Quick start
 
-| Command | Effect |
+Requirements: Node 22+, pnpm, Docker (or any Postgres 14+), an API key for an OpenAI-compatible LLM gateway.
+
+```bash
+git clone https://github.com/v0lumehi/heinzel.git && cd heinzel
+cp .env.example .env              # LLM_API_KEY, model ids, chat platform credentials
+pnpm install
+docker compose up -d postgres
+pnpm build:web                    # admin UI
+pnpm dev                          # migrates the database and connects
+```
+
+Then connect a chat platform:
+
+- **Slack** (works from a laptop, no public URL): create the app from [`slack-app-manifest.yaml`](slack-app-manifest.yaml) on [api.slack.com/apps](https://api.slack.com/apps), set `SLACK_APP_TOKEN` (app-level token with `connections:write`) and `SLACK_BOT_TOKEN` (after *Install to Workspace*). Invite the bot with `/invite @Heinzel` and send `@Heinzel !help`.
+- **Microsoft Teams:** try it without a tenant in the Agents Playground (`TEAMS_PLAYGROUND=true`), then connect a real tenant: [docs/TEAMS.md](docs/TEAMS.md).
+
+The **admin UI** runs on http://localhost:3080 (`ADMIN_DEV_LOGIN=true` for a local sign-in button). Its *Setup* page walks you through Slack and Teams and checks the connection.
+
+## Deployment
+
+| | |
 |---|---|
-| `!status` | Settings and 24h usage for this channel |
-| `!ambient on` / `!ambient off` | Let Heinzel speak up without being tagged |
-| `!limit <n>` / `!limit default` | Max unprompted posts per day in this channel |
-| `!instructions <text>` | Standing instructions for this channel (`!instructions` shows, `!instructions clear` removes) |
-| `!memories [query]` | What Heinzel remembers here |
-| `!deep <question>` | Answer with the strong model right away |
-| `!go [id]` / `!stop [id]` / `!coding` | Start, cancel or list [coding sessions](docs/CODING.md) |
-| `!help` | Command list |
+| Kubernetes | Helm chart `oci://ghcr.io/v0lumehi/charts/heinzel`: non-root, read-only root filesystem, probes, ingress, coding Jobs with RBAC, egress proxy and NetworkPolicy. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Docker Compose | `docker compose --profile app up -d` for a single machine |
+| Images | `ghcr.io/v0lumehi/heinzel`, `ghcr.io/v0lumehi/heinzel-coder` — amd64 and arm64, signed with cosign, with SBOM and provenance. [SECURITY.md](SECURITY.md) |
+| Upgrades | Migrations run at startup; [CHANGELOG.md](CHANGELOG.md) says when you need to act |
 
-## Quick start (your own Slack workspace)
+## Documentation
 
-Requirements: Node 22+, pnpm, Docker (or any Postgres 14+), a Requesty API key.
+| Topic | |
+|---|---|
+| Architecture and design decisions | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Deployment, Helm, upgrades | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Admin UI, single sign-on, settings | [docs/ADMIN.md](docs/ADMIN.md) |
+| Microsoft Teams | [docs/TEAMS.md](docs/TEAMS.md) |
+| Tools and MCP servers | [docs/TOOLS.md](docs/TOOLS.md) |
+| Coding sessions | [docs/CODING.md](docs/CODING.md) |
+| Configuration reference | [.env.example](.env.example) |
+| Roadmap and open decisions | [docs/ROADMAP.md](docs/ROADMAP.md) |
+| Releasing | [docs/RELEASING.md](docs/RELEASING.md) |
 
-1. **Create a test workspace** at [slack.com/get-started](https://slack.com/get-started#/createnew) (the free plan is fine).
-2. **Create the Slack app:** [api.slack.com/apps](https://api.slack.com/apps) → *Create New App* → *From a manifest* → pick your workspace → paste [`slack-app-manifest.yaml`](slack-app-manifest.yaml) → *Create*.
-3. **App-level token:** *Basic Information* → *App-Level Tokens* → *Generate* with scope `connections:write`. This is `SLACK_APP_TOKEN` (`xapp-…`).
-4. **Install:** *Install App* → *Install to Workspace*. Copy the *Bot User OAuth Token* — this is `SLACK_BOT_TOKEN` (`xoxb-…`).
-5. **Configure and run:**
-   ```bash
-   cp .env.example .env          # fill in LLM_API_KEY, model ids and the two Slack tokens
-   pnpm install
-   docker compose up -d postgres
-   pnpm dev                      # migrates the database and connects via Socket Mode
-   ```
-6. **Optional, tools:** `cp mcp.example.json mcp.json`, set `MCP_CONFIG=mcp.json` in `.env`, check with `pnpm mcp`. Details: [docs/TOOLS.md](docs/TOOLS.md).
-7. **Try it:** invite the bot to a channel (`/invite @Heinzel`), then `@Heinzel !help`, ask it something, or `@Heinzel !ambient on`.
+## Contributing
 
-Socket Mode means no public URL is needed — it runs fine from a laptop.
-
-**Admin UI:** `pnpm build:web`, set `ADMIN_DEV_LOGIN=true`, restart, open http://localhost:3080. Single sign-on: [docs/ADMIN.md](docs/ADMIN.md).
-
-**Microsoft Teams:** set `TEAMS_PLAYGROUND=true` and try it locally in the Microsoft 365 Agents Playground, no tenant needed. Setup for a real tenant: [docs/TEAMS.md](docs/TEAMS.md).
-
-### Production
-
-Kubernetes with the Helm chart, signed images, upgrades: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Releases: [CHANGELOG.md](CHANGELOG.md), [docs/RELEASING.md](docs/RELEASING.md). Security: [SECURITY.md](SECURITY.md).
-
-### Run in Docker
-
-```bash
-docker compose --profile app up -d --build
-```
-
-With MCP tools, mount the config into the container (`volumes: ["./mcp.json:/app/mcp.json:ro"]` on the `heinzel` service) and set `MCP_CONFIG=/app/mcp.json`. The image contains no npm/npx: run MCP servers as their own containers with an HTTP endpoint, or bake stdio servers into a derived image (docs/TOOLS.md).
-
-## Development
-
-```bash
-pnpm typecheck
-pnpm test                         # unit tests; DB tests are skipped without a database
-
-# everything, against a throwaway database
-docker compose exec postgres createdb -U heinzel heinzel_test
-TEST_DATABASE_URL=postgres://heinzel:heinzel@localhost:5432/heinzel_test pnpm test
-```
-
-The test database is wiped on every run — never point `TEST_DATABASE_URL` at real data.
-
-- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- Roadmap and open decisions: [docs/ROADMAP.md](docs/ROADMAP.md)
-- Notes for coding agents and contributors: [AGENTS.md](AGENTS.md)
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); coding agents also read [AGENTS.md](AGENTS.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

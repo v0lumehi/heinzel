@@ -19,6 +19,7 @@ pnpm install
 pnpm typecheck
 pnpm test                                    # DB tests skip without TEST_DATABASE_URL
 TEST_DATABASE_URL=postgres://… pnpm test     # full suite; the database is DROPPED and recreated
+pnpm test:coverage                           # same with coverage (coverage/; uploaded to Codecov in CI)
 pnpm dev                                     # needs .env (see .env.example)
 pnpm build && pnpm start
 pnpm mcp                                     # list tools of the MCP servers in MCP_CONFIG

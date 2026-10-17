@@ -19,6 +19,7 @@
     "mcp": "tsx src/mcp/cli.ts",
     "teams:package": "tsx src/adapters/teams/package-cli.ts",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -42,10 +43,11 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "5.0.3",
     "pino-pretty": "^13.2.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.3"
   },
   "packageManager": "pnpm@10.28.0"
 }

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/v0lumehi/heinzel/security/advisories/new
+    about: Please report security issues privately.
+  - name: Questions and ideas
+    url: https://github.com/v0lumehi/heinzel/discussions
+    about: Ask and discuss in GitHub Discussions.

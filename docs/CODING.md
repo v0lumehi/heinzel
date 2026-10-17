@@ -94,3 +94,5 @@ What remains: the agent can read everything in the repository and send it to you
 - Backends: OpenCode only. GitLab Duo Agent Platform is planned as a second backend (`backend` column on `coding_sessions`): for customers with DAP, sessions would run on their GitLab runners.
 - One task per session; follow-up requests in the same thread start a new session (continuing a session is planned).
 - Push options create merge requests on GitLab only. On other hosts the branch is pushed and the final message says so.
+- Empty repositories work: Heinzel first pushes an empty "Initialize repository" commit to the default branch (GitLab allows developers this first push), so the merge request has a target.
+- A new session starts from the default branch. To build on an unmerged session, merge its MR first or ask for the session's branch as the base (the tool has a `base_branch` argument).

@@ -77,7 +77,17 @@ try {
   const base = env.HEINZEL_BASE_BRANCH || null;
   log(`cloning ${repoUrl}${base ? ` (${base})` : ""}`);
   must("git", ["-c", authHeader, "clone", "--quiet", "--no-tags", "--single-branch", "--depth", "200", ...(base ? ["--branch", base] : []), repoUrl, ORIGIN]);
-  const baseBranch = base ?? must("git", ["-C", ORIGIN, "rev-parse", "--abbrev-ref", "HEAD"]);
+  const empty = run("git", ["-C", ORIGIN, "rev-parse", "--verify", "--quiet", "HEAD"]).code !== 0;
+  const baseBranch = base ?? (empty ? must("git", ["-C", ORIGIN, "symbolic-ref", "--short", "HEAD"]) : must("git", ["-C", ORIGIN, "rev-parse", "--abbrev-ref", "HEAD"]));
+  if (empty) {
+    // A merge request needs a target branch: give the empty repository an empty root commit on its default branch.
+    // GitLab lets developers make this first push to a new project's default branch.
+    log(`repository is empty: pushing an empty initial commit to ${baseBranch}`);
+    const author = ["-c", `user.name=${env.HEINZEL_GIT_AUTHOR_NAME || "Heinzel"}`, "-c", `user.email=${env.HEINZEL_GIT_AUTHOR_EMAIL || "heinzel@localhost"}`];
+    must("git", ["-C", ORIGIN, ...author, "commit", "--quiet", "--allow-empty", "-m", "Initialize repository"]);
+    must("git", ["-C", ORIGIN, "-c", authHeader, "push", "--quiet", "origin", `HEAD:refs/heads/${baseBranch}`]);
+    must("git", ["-C", ORIGIN, "fetch", "--quiet", "origin"]);
+  }
 
   // 2. The agent's checkout: a local clone without credentials, owned by the agent user.
   if (existsSync(WORK)) rmSync(WORK, { recursive: true, force: true });

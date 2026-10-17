@@ -123,7 +123,8 @@ export function loadMcpConfig(path: string, env: NodeJS.ProcessEnv = process.env
   try {
     raw = JSON.parse(readFileSync(path, "utf8"));
   } catch (err) {
-    throw new Error(`Cannot read MCP config ${path}: ${err instanceof Error ? err.message : String(err)}`);
+    const hint = (err as NodeJS.ErrnoException).code === "ENOENT" ? ` (create it with: cp mcp.example.json ${path}, or unset MCP_CONFIG)` : "";
+    throw new Error(`Cannot read MCP config ${path}: ${err instanceof Error ? err.message : String(err)}${hint}`);
   }
   return parseMcpConfig(raw, env);
 }

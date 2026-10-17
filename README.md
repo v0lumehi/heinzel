@@ -13,6 +13,7 @@
   <a href="https://github.com/v0lumehi/heinzel/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/v0lumehi/heinzel/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="https://codecov.io/gh/v0lumehi/heinzel"><img alt="Coverage" src="https://codecov.io/gh/v0lumehi/heinzel/graph/badge.svg"></a>
   <a href="https://github.com/v0lumehi/heinzel/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/v0lumehi/heinzel/actions/workflows/codeql.yml/badge.svg?branch=main"></a>
+  <a href="https://www.bestpractices.dev/projects/15626"><img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/15626/badge"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/v0lumehi/heinzel"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/v0lumehi/heinzel/badge"></a>
   <a href="https://github.com/v0lumehi/heinzel/releases"><img alt="Release" src="https://img.shields.io/github/v/release/v0lumehi/heinzel?include_prereleases&sort=semver"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/github/license/v0lumehi/heinzel"></a>

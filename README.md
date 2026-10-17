@@ -83,7 +83,7 @@ Kubernetes with the Helm chart, signed images, upgrades: [docs/DEPLOYMENT.md](do
 docker compose --profile app up -d --build
 ```
 
-With MCP tools, mount the config into the container (`volumes: ["./mcp.json:/app/mcp.json:ro"]` on the `heinzel` service) and set `MCP_CONFIG=/app/mcp.json`. Servers started with `npx` work in the image; others need their own container with an HTTP endpoint.
+With MCP tools, mount the config into the container (`volumes: ["./mcp.json:/app/mcp.json:ro"]` on the `heinzel` service) and set `MCP_CONFIG=/app/mcp.json`. The image contains no npm/npx: run MCP servers as their own containers with an HTTP endpoint, or bake stdio servers into a derived image (docs/TOOLS.md).
 
 ## Development
 

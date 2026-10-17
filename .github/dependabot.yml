@@ -15,3 +15,7 @@ updates:
     directories: ["/", "/coder"]
     schedule: { interval: weekly }
     cooldown: { default-days: 14 }
+    ignore:
+      # Node major versions are changed by hand, to the next LTS line only.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

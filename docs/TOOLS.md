@@ -54,7 +54,14 @@ The file uses the common `mcpServers` format (Claude Desktop, Cursor, VS Code), 
 - `${VAR}` is replaced with the environment value (from `.env` or the real environment); `${VAR:-default}` falls back to `default`. An unset variable without default stops startup with a clear error.
 - The server name becomes the tool prefix the model sees (`gitlab__get_issue`): letters, digits and `-`, at most 20 characters. `web` is reserved.
 - Tool results longer than `TOOL_RESULT_MAX_CHARS` (default 16000) are cut.
-- For your own infrastructure, prefer servers that run as their own container with an HTTP endpoint (`url`). A `command` like `npx -y …` downloads the server from the npm registry at every start, which needs internet access and is not reproducible.
+- For your own infrastructure, prefer servers that run as their own container with an HTTP endpoint (`url`). A `command` like `npx -y …` downloads the server from the npm registry at every start, which needs internet access and is not reproducible. The Heinzel image therefore ships without npm/npx. To use a stdio server in production, bake a pinned version into a derived image:
+  ```dockerfile
+  FROM node:22-trixie-slim AS tools
+  RUN npm install -g --prefix /opt/mcp @some/mcp-server@1.2.3
+  FROM ghcr.io/v0lumehi/heinzel:<version>
+  COPY --from=tools /opt/mcp /opt/mcp
+  ```
+  and use `"command": "/opt/mcp/bin/some-mcp-server"` in `mcp.json`. (`npx` still works with `pnpm dev`.)
 
 ## Keep the tool list short
 

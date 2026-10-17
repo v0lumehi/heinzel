@@ -63,6 +63,8 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
+          # Reviewed exceptions with an expiry date; the file names the reason for each.
+          trivyignores: ${{ matrix.image.context }}/.trivyignore
 
   helm:
     runs-on: ubuntu-24.04

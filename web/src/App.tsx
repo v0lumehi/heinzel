@@ -114,7 +114,7 @@ function Shell({ me }: { me: MeResponse }) {
       <AppShell.Main>
         <Routes>
           <Route path="/" element={<Navigate to="/channels" replace />} />
-          <Route path="/setup" element={<SetupPage />} />
+          <Route path="/setup" element={<SetupPage canEdit={user.role === "admin"} />} />
           <Route path="/channels" element={<ChannelsPage />} />
           <Route path="/channels/:key" element={<ChannelDetailPage canEdit={user.role === "admin"} />} />
           <Route path="/memories" element={<MemoriesPage canEdit={user.role === "admin"} />} />

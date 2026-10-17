@@ -166,7 +166,7 @@ export const RUNTIME_SETTINGS = [
   { key: "LLM_MODEL_HEAVY", kind: "text", group: "Models", label: "Heavy model", help: "Optional strong model for hard tasks. Empty disables it." },
   { key: "HEAVY_DAILY_LIMIT", kind: "number", group: "Models", label: "Heavy runs per channel and day", help: "" },
   { key: "AMBIENT_DEFAULT", kind: "boolean", group: "Ambient mode", label: "On for new channels", help: "Channels can change it with !ambient or here per channel." },
-  { key: "AMBIENT_DAILY_LIMIT", kind: "number", group: "Ambient mode", label: "Unprompted posts per channel and day", help: "Default; channels can override it." },
+  { key: "AMBIENT_DAILY_LIMIT", kind: "number", group: "Ambient mode", label: "Unprompted posts per channel and day", help: "The default for all channels. Each channel can set its own limit." },
   { key: "AMBIENT_THREAD_COOLDOWN_MIN", kind: "number", group: "Ambient mode", label: "Minutes between unprompted posts in a thread", help: "" },
   { key: "AMBIENT_MIN_CONFIDENCE", kind: "number", group: "Ambient mode", label: "Minimum triage confidence", help: "0 to 1. Higher = speaks up less often." },
   { key: "CONTEXT_MESSAGES", kind: "number", group: "Agent", label: "Messages of context", help: "Prior messages of a thread or channel the agent reads." },
@@ -190,7 +190,7 @@ export function isRuntimeKey(key: string): key is RuntimeKey {
 export function parseSetting(key: RuntimeKey, raw: string): { ok: true; value: Config[RuntimeKey] } | { ok: false; error: string } {
   const field = schema.shape[key] as z.ZodType;
   const parsed = field.safeParse(raw);
-  return parsed.success ? { ok: true, value: parsed.data as Config[RuntimeKey] } : { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
+  return parsed.success ? { ok: true, value: parsed.data as Config[RuntimeKey] } : { ok: false, error: parsed.error.issues.map((i) => i.message).join(". ") };
 }
 
 export function lockedSettings(config: Config): Set<string> {

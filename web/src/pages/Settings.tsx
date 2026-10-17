@@ -3,6 +3,7 @@ import { notifications } from "@mantine/notifications";
 import { IconLock } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import { api, type ConfigResponse, type ConfigSettingRow } from "../api";
 import { Loaded, PageHeader, SectionTitle } from "../components";
 
@@ -14,18 +15,23 @@ const SOURCE = {
 
 export function SettingsPage({ canEdit }: { canEdit: boolean }) {
   const config = useQuery({ queryKey: ["config"], queryFn: () => api<ConfigResponse>("/api/config") });
+  const { hash } = useLocation();
+  // Jump to a group (e.g. #data from the setup page) once the settings are loaded.
+  useEffect(() => {
+    if (hash && config.data) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [hash, config.data]);
   return (
     <>
       <PageHeader title="Settings" />
       <Text c="dimmed" mb="md" maw={760}>
-        Changes apply immediately on all instances. Values set in the deployment (environment, Helm values) are the starting point; a value changed
-        here overrides them until you reset it. Settings listed in LOCKED_SETTINGS can only be changed in the deployment.
+        Changes apply immediately on all instances. The values from the deployment (environment, Helm values) are the starting point. A value
+        changed here replaces them until you reset it. Settings listed in LOCKED_SETTINGS can only be changed in the deployment.
       </Text>
       <Loaded query={config}>
         {(c) => {
           const groups = [...new Set(c.settings.map((s) => s.group))];
           return groups.map((g) => (
-            <div key={g}>
+            <div key={g} id={g.toLowerCase().replace(/\s+/g, "-")} style={{ scrollMarginTop: 72 }}>
               <SectionTitle>{g}</SectionTitle>
               <Paper withBorder>
                 {c.settings

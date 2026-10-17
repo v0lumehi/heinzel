@@ -37,7 +37,8 @@ export function UsagePage() {
                 <Stat label="Output tokens" value={total.c} />
               </SimpleGrid>
               <Text size="sm" c="dimmed">
-                Costs depend on the models' prices; your LLM gateway (e.g. Requesty) shows them per channel via the request metadata.
+                Costs depend on the prices of the models. Your LLM gateway (for example Requesty) shows them per channel, based on the metadata
+                Heinzel sends with each request.
               </Text>
               <SectionTitle>By channel</SectionTitle>
               <Paper withBorder>

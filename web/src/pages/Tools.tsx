@@ -38,8 +38,8 @@ export function ToolsPage({ canEdit }: { canEdit: boolean }) {
       </Loaded>
       <SectionTitle>MCP servers</SectionTitle>
       <Text size="sm" c="dimmed" mb="sm" maw={760}>
-        Servers from the deployment (mcp.json) are read-only here. Servers added here must be reachable over HTTP (streamable HTTP); commands on
-        the Heinzel host (stdio) can only be configured in the deployment.
+        Servers from the deployment (mcp.json) are read-only here. Servers you add here must be reachable over HTTP (streamable HTTP). Servers
+        that run as a command on the Heinzel host (stdio) can only be set up in the deployment.
       </Text>
       <Loaded query={servers}>
         {(rows) => (
@@ -176,8 +176,8 @@ function ServerForm({ server, canStoreSecrets, onClose }: { server: McpServerRow
         <div>
           <Text size="sm" fw={500}>Headers</Text>
           <Text size="xs" c="dimmed" mb={4}>
-            E.g. Authorization: Bearer … Values are encrypted and never shown again; leave a value empty to keep the stored one. ${"{VAR}"} reads an
-            environment variable of the deployment.
+            For example Authorization: Bearer … Values are stored encrypted and never shown again. Leave a value empty to keep the stored one.
+            ${"{VAR}"} reads an environment variable of the deployment.
           </Text>
           <Stack gap={6}>
             {headers.map((h, i) => (

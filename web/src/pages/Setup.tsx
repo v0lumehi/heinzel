@@ -1,12 +1,14 @@
 import { Accordion, Alert, Anchor, Badge, Button, Code, CopyButton, Group, List, Paper, Stack, Text, ThemeIcon, Timeline } from "@mantine/core";
 import { IconAlertTriangle, IconBrandSlack, IconBrandTeams, IconCheck, IconDownload, IconInfoCircle } from "@tabler/icons-react";
-import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { notifications } from "@mantine/notifications";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { api, type SetupResponse } from "../api";
 import { Loaded, PageHeader, SectionTitle } from "../components";
 import { fmtDate } from "../format";
 
-export function SetupPage() {
+export function SetupPage({ canEdit }: { canEdit: boolean }) {
   const setup = useQuery({ queryKey: ["setup"], queryFn: () => api<SetupResponse>("/api/setup"), refetchInterval: 10_000 });
   return (
     <>
@@ -14,7 +16,7 @@ export function SetupPage() {
       <Loaded query={setup}>
         {(s) => (
           <>
-            <Checklist checks={s.checks} />
+            <Checklist checks={s.checks} canEdit={canEdit} />
             <SectionTitle>Chat platforms</SectionTitle>
             <Text size="sm" c="dimmed" mb="sm" maw={760}>
               Credentials are deployment configuration: put them into the environment (Helm Secret, .env) and restart. This page shows the steps
@@ -45,8 +47,8 @@ export function SetupPage() {
   );
 }
 
-function Checklist({ checks }: { checks: SetupResponse["checks"] }) {
-  const open = checks.filter((c) => !c.ok);
+function Checklist({ checks, canEdit }: { checks: SetupResponse["checks"]; canEdit: boolean }) {
+  const open = checks.filter((c) => !c.ok && !c.dismissed);
   return (
     <Paper withBorder p="md">
       <Group justify="space-between" mb="sm">
@@ -55,24 +57,84 @@ function Checklist({ checks }: { checks: SetupResponse["checks"] }) {
           {checks.length - open.length} of {checks.length} done
         </Badge>
       </Group>
-      <Stack gap="xs">
+      <Stack gap="md">
         {checks.map((c) => (
-          <Group key={c.id} gap="sm" wrap="nowrap" align="flex-start">
-            <ThemeIcon size="sm" radius="xl" color={c.ok ? "green" : c.level === "required" ? "red" : "yellow"} variant="light" mt={2}>
-              {c.ok ? <IconCheck size={14} /> : <IconAlertTriangle size={14} />}
-            </ThemeIcon>
-            <div>
-              <Text size="sm" fw={500}>
-                {c.title}
-                {!c.ok && c.level === "recommended" && <Text span size="xs" c="dimmed"> · recommended</Text>}
-              </Text>
-              {!c.ok && <Text size="xs" c="dimmed">{c.hint}</Text>}
-            </div>
-          </Group>
+          <CheckRow key={c.id} check={c} canEdit={canEdit} />
         ))}
       </Stack>
     </Paper>
   );
+}
+
+function CheckRow({ check: c, canEdit }: { check: SetupResponse["checks"][number]; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const decide = useMutation({
+    mutationFn: (dismissed: boolean) => api(`/api/setup/checks/${c.id}`, { method: "PUT", body: { dismissed } }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["setup"] }),
+    onError: (err) => notifications.show({ title: "Not saved", message: err.message, color: "red" }),
+  });
+  const done = c.ok || c.dismissed;
+  const color = done ? "green" : c.level === "required" ? "red" : "yellow";
+  return (
+    <Group gap="sm" wrap="nowrap" align="flex-start">
+      <ThemeIcon size="sm" radius="xl" color={color} variant="light" mt={2}>
+        {done ? <IconCheck size={14} /> : <IconAlertTriangle size={14} />}
+      </ThemeIcon>
+      <Stack gap={6} style={{ minWidth: 0, flex: 1 }}>
+        <Text size="sm" fw={500}>
+          {c.title}
+          {c.dismissed && <Text span size="xs" c="dimmed"> · marked as decided</Text>}
+          {!done && c.level === "recommended" && <Text span size="xs" c="dimmed"> · recommended</Text>}
+        </Text>
+        {!c.ok && !c.dismissed && <Text size="xs" c="dimmed">{c.hint}</Text>}
+        {!c.ok && !c.dismissed && c.action && <CheckAction action={c.action} />}
+        {!c.ok && canEdit && c.level === "recommended" && (
+          <Group>
+            <Button size="compact-xs" variant="subtle" loading={decide.isPending} onClick={() => decide.mutate(!c.dismissed)}>
+              {c.dismissed ? "Show again" : "Mark as decided"}
+            </Button>
+          </Group>
+        )}
+      </Stack>
+    </Group>
+  );
+}
+
+function CheckAction({ action }: { action: NonNullable<SetupResponse["checks"][number]["action"]> }) {
+  const [key, setKey] = useState<string | null>(null);
+  if (action.kind === "page") {
+    return (
+      <Group>
+        <Button component={Link} to={action.to} size="compact-xs" variant="light">{action.label}</Button>
+      </Group>
+    );
+  }
+  if (action.kind === "deployment") return <Snippet text={action.snippet} />;
+  return key ? (
+    <Stack gap={4}>
+      <Snippet text={`SECRETS_KEY=${key}`} />
+      <Text size="xs" c="dimmed">Made in your browser and not stored anywhere. Put it into the deployment's secrets and restart.</Text>
+    </Stack>
+  ) : (
+    <Group>
+      <Button size="compact-xs" variant="light" onClick={() => setKey(randomKey())}>Generate a key</Button>
+    </Group>
+  );
+}
+
+function Snippet({ text }: { text: string }) {
+  return (
+    <Group gap="xs" align="flex-start" wrap="nowrap">
+      <Code block style={{ flex: 1, minWidth: 0, overflowX: "auto" }}>{text}</Code>
+      <CopyButton value={text}>{({ copied, copy }) => <Button size="compact-xs" variant="subtle" onClick={copy}>{copied ? "Copied" : "Copy"}</Button>}</CopyButton>
+    </Group>
+  );
+}
+
+/** 32 random bytes, base64: the format SECRETS_KEY expects. */
+function randomKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes));
 }
 
 function PlatformTitle({ name, p }: { name: string; p: SetupResponse["platforms"][number] }) {
@@ -157,8 +219,8 @@ function TeamsSteps({ setup }: { setup: SetupResponse }) {
       <Timeline bulletSize={22} lineWidth={2} active={-1}>
         <Step title="Make the messaging endpoint reachable over HTTPS">
           <Text size="sm">
-            Microsoft sends messages to <Code>/api/messages</Code> on port <Code>{t.port}</Code>. In production use the Helm ingress for Teams; for
-            a test from a laptop a dev tunnel (<Code>devtunnel host -p {t.port} --allow-anonymous</Code>).
+            Microsoft sends messages to <Code>/api/messages</Code> on port <Code>{t.port}</Code>. In production, use the Helm ingress for Teams. To
+            test from a laptop, use a dev tunnel: <Code>devtunnel host -p {t.port} --allow-anonymous</Code>.
           </Text>
         </Step>
         <Step title="Register the bot">

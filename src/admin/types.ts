@@ -146,6 +146,10 @@ export interface SetupCheck {
   level: "required" | "recommended";
   title: string;
   hint: string;
+  /** What fixes it: a page of this UI, or lines for the deployment configuration. */
+  action: { kind: "page"; to: string; label: string } | { kind: "deployment"; snippet: string } | { kind: "generate-key" } | null;
+  /** Recommended checks can be marked as decided by an admin (e.g. keeping messages on purpose). */
+  dismissed: boolean;
 }
 
 export interface SetupResponse {

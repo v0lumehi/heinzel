@@ -9,6 +9,7 @@ import type { ChannelDetailResponse, ChannelRow, MeResponse, SetupResponse } fro
 import type { Db } from "../src/db/pool.js";
 import { MemoryStore } from "../src/memory/memory.js";
 import { AdminSessionStore } from "../src/store/admin.js";
+import { SettingsStore } from "../src/store/settings.js";
 import { Store } from "../src/store/store.js";
 import { TEST_DATABASE_URL, freshDb, msg, silentLog, testConfig } from "./helpers.js";
 
@@ -44,6 +45,7 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
       sessions,
       tools: () => ({ builtin: ["remember"], servers: [{ server: "search", tools: [{ name: "searxng_web_search", exposedAs: "search__searxng_web_search" }] }] }),
       platforms: () => [{ platform: "slack", status: { connected: true, detail: "workspace test" } }],
+      settings: new SettingsStore(db),
       log: silentLog,
       staticDir,
     });
@@ -53,7 +55,7 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
     await db?.end();
   });
   beforeEach(async () => {
-    await db.query("TRUNCATE channels, events, memories, audit_log, admin_sessions, llm_usage RESTART IDENTITY CASCADE");
+    await db.query("TRUNCATE channels, events, memories, audit_log, admin_sessions, llm_usage, settings RESTART IDENTITY CASCADE");
     await store.ensureChannel("slack", "C1", "general", false);
     await store.insertEvent(msg());
   });
@@ -151,7 +153,18 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
     const setup = (await app.inject({ url: "/api/setup", headers: { cookie } })).json<SetupResponse>();
     expect(setup.platforms.map((p) => [p.platform, p.configured])).toEqual([["slack", true], ["teams", false]]);
     expect(setup.platforms[0]!.lastMessageAt).not.toBeNull();
-    expect(setup.checks.find((c) => c.id === "sso")).toMatchObject({ ok: false, level: "required" });
+    expect(setup.checks.find((c) => c.id === "sso")).toMatchObject({ ok: false, level: "required", action: { kind: "deployment" } });
+    expect(setup.checks.find((c) => c.id === "retention")).toMatchObject({ dismissed: false, action: { kind: "page", to: "/settings#data" } });
+
+    const me = (await app.inject({ url: "/api/me", headers: { cookie } })).json<MeResponse>();
+    const decide = (id: string, dismissed: boolean) =>
+      app.inject({ method: "PUT", url: `/api/setup/checks/${id}`, headers: { cookie, "x-csrf-token": me.csrfToken! }, payload: { dismissed } });
+    expect((await decide("retention", true)).statusCode).toBe(200);
+    expect((await decide("sso", true)).statusCode).toBe(404); // required checks cannot be waved through
+    const after = (await app.inject({ url: "/api/setup", headers: { cookie } })).json<SetupResponse>();
+    expect(after.checks.find((c) => c.id === "retention")!.dismissed).toBe(true);
+    expect((await store.listAudit({ target: "setup:retention" }))[0]).toMatchObject({ action: "setup.decided" });
+    await decide("retention", false);
     const manifest = await app.inject({ url: "/api/setup/slack-manifest.yaml", headers: { cookie } });
     expect(manifest.headers["content-disposition"]).toContain("attachment");
     expect(manifest.body).toContain("socket_mode_enabled: true");

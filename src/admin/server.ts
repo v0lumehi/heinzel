@@ -14,6 +14,7 @@ import { slackManifest } from "../adapters/slack/manifest.js";
 import type { Config } from "../config.js";
 import type { Platform, PlatformStatus } from "../core/types.js";
 import { SettingsError, type RuntimeConfig } from "../core/runtime.js";
+import type { SettingsStore } from "../store/settings.js";
 import type { McpServerReport } from "../mcp/hub.js";
 import type { Memory, MemoryStore } from "../memory/memory.js";
 import type { AdminSession, AdminSessionStore } from "../store/admin.js";
@@ -50,6 +51,8 @@ export interface AdminDeps {
   platforms?: () => { platform: Platform; status: PlatformStatus | null }[];
   /** Runtime settings and MCP servers editable in the UI. */
   runtime?: RuntimeConfig;
+  /** Where decisions on recommended setup checks are kept. */
+  settings?: SettingsStore;
   log: Logger;
   /** Built web UI (web/dist). Missing = API only. */
   staticDir?: string;
@@ -213,7 +216,7 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
     api.patch("/api/channels/:key", async (req, reply): Promise<ChannelRow | undefined> => {
       const { key } = req.params as { key: string };
       const parsed = channelPatch.safeParse(req.body);
-      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues.map((i) => i.message).join("; ") });
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues.map((i) => i.message).join(". ") });
       const before = await d.store.getChannel(key);
       if (!before) return reply.code(404).send({ error: "Unknown channel" });
       await d.store.updateChannel(key, parsed.data);
@@ -292,7 +295,7 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
       .strict();
     const parseMcp = (req: FastifyRequest) => {
       const parsed = mcpInput.safeParse(req.body);
-      if (!parsed.success) throw new SettingsError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+      if (!parsed.success) throw new SettingsError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(". "));
       return { name: (req.params as { name: string }).name, ...parsed.data };
     };
 
@@ -326,44 +329,54 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
           lastMessageAt: iso(last[platform]),
         };
       });
-      const mcpErrors = d.tools().servers.filter((s) => s.error).map((s) => s.server);
-      const checks: SetupCheck[] = [
+      const mcpErrors = d.tools().servers.filter((x) => x.error).map((x) => x.server);
+      const dismissed = new Set((await d.settings?.all())?.filter((x) => x.key.startsWith(DISMISS_PREFIX)).map((x) => x.key.slice(DISMISS_PREFIX.length)));
+      const raw: Omit<SetupCheck, "dismissed">[] = [
         {
           id: "platform",
           ok: platforms.some((p) => p.connected && p.lastMessageAt),
           level: "required",
           title: "A chat platform delivers messages",
-          hint: "Connect Slack or Teams below, then write to the bot once.",
+          hint: "Connect Slack or Teams with the steps below, then write to the bot once.",
+          action: null,
         },
         {
           id: "sso",
           ok: !!config.ADMIN_OIDC_ISSUER,
           level: "required",
           title: "Single sign-on for this admin UI",
-          hint: "Set ADMIN_OIDC_ISSUER, ADMIN_OIDC_CLIENT_ID and ADMIN_OIDC_CLIENT_SECRET (docs/ADMIN.md). The development sign-in is for local use only.",
+          hint: "Sign-in is set in the deployment so that nobody can lock others out or let themselves in from here. The development sign-in is meant for local use only. See docs/ADMIN.md for the identity provider setup.",
+          action: {
+            kind: "deployment",
+            snippet: "ADMIN_PUBLIC_URL=https://heinzel-admin.example.com\nADMIN_OIDC_ISSUER=https://login.microsoftonline.com/<tenant id>/v2.0\nADMIN_OIDC_CLIENT_ID=<client id>\nADMIN_OIDC_CLIENT_SECRET=<client secret>",
+          },
         },
         {
           id: "secrets",
           ok: !!config.SECRETS_KEY,
           level: "recommended",
           title: "Key for stored secrets",
-          hint: "Set SECRETS_KEY (openssl rand -base64 32) so tokens of MCP servers can be stored here.",
+          hint: "With this key, tokens of tool servers can be stored here in encrypted form. Keep the key in the deployment's secret store, not in this database.",
+          action: { kind: "generate-key" },
         },
         {
           id: "retention",
           ok: config.EVENTS_RETENTION_DAYS > 0,
           level: "recommended",
           title: "Retention for message copies",
-          hint: "Message copies are kept forever. Decide on a retention period (Settings → Data) that fits your data protection policy.",
+          hint: "Message copies are kept forever at the moment. Choose a retention period that fits your data protection policy, or mark it as decided if you keep them on purpose.",
+          action: { kind: "page", to: "/settings#data", label: "Open data settings" },
         },
         {
           id: "tools",
           ok: mcpErrors.length === 0,
           level: "recommended",
           title: "Tool servers reachable",
-          hint: mcpErrors.length ? `Unavailable: ${mcpErrors.join(", ")} (see Tools).` : "All configured MCP servers are connected.",
+          hint: mcpErrors.length ? `These tool servers cannot be reached: ${mcpErrors.join(", ")}.` : "All configured tool servers are connected.",
+          action: mcpErrors.length ? { kind: "page", to: "/tools", label: "Open tools" } : null,
         },
       ];
+      const checks: SetupCheck[] = raw.map((c) => ({ ...c, dismissed: c.level === "recommended" && !c.ok && dismissed.has(c.id) }));
       return {
         botName: config.BOT_NAME,
         platforms,
@@ -376,6 +389,17 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
         },
         checks,
       };
+    });
+
+    api.put("/api/setup/checks/:id", async (req, reply) => {
+      const id = (req.params as { id: string }).id;
+      const body = z.object({ dismissed: z.boolean() }).strict().safeParse(req.body);
+      if (!body.success) throw new SettingsError("Expected { dismissed: boolean }");
+      if (!["secrets", "retention", "tools"].includes(id)) return reply.code(404).send({ error: "Only recommended checks can be marked as decided" });
+      if (!d.settings) throw new SettingsError("Settings storage is not available");
+      await d.settings.set(DISMISS_PREFIX + id, body.data.dismissed ? "true" : null, actor(req).actor);
+      await d.store.recordAudit({ ...actor(req), action: body.data.dismissed ? "setup.decided" : "setup.reopened", target: `setup:${id}` });
+      return { ok: true };
     });
 
     api.get("/api/setup/slack-manifest.yaml", async (_req, reply) =>
@@ -408,6 +432,8 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
 
   return app;
 }
+
+const DISMISS_PREFIX = "setup.decided.";
 
 const APP_VERSION = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
 

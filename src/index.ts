@@ -82,11 +82,12 @@ if (adapters.size === 0) {
 
 const mcp = new McpHub({ log: log.child({ component: "mcp" }), maxResultChars: config.TOOL_RESULT_MAX_CHARS });
 // Applies settings and MCP servers from the admin UI on top of the environment, and connects the MCP servers.
+const settingsStore = new SettingsStore(db);
 const runtime = new RuntimeConfig({
   config,
   env: process.env,
   db,
-  settings: new SettingsStore(db),
+  settings: settingsStore,
   store,
   mcp,
   fileServers: mcpServers,
@@ -153,6 +154,7 @@ if (config.ADMIN_OIDC_ISSUER || config.ADMIN_DEV_LOGIN) {
       tools: () => ({ builtin: tools().filter((t) => !t.source).map((t) => t.name), servers: mcp.report }),
       oidc,
       runtime,
+      settings: settingsStore,
       platforms: () => [...adapters.values()].map((a) => ({ platform: a.platform, status: a.status?.() ?? null })),
       log: log.child({ component: "admin" }),
     });

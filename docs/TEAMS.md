@@ -34,7 +34,7 @@ For scripted tests there is the headless client `@microsoft/m365agentsplayground
    - *Channels* → add *Microsoft Teams*.
    - *Configuration* → messaging endpoint `https://<public host>/api/messages`.
 3. **Public URL for local development:** `devtunnel host -p 3978 --allow-anonymous` (Microsoft Dev Tunnels) or `ngrok http 3978`. Anonymous tunnel access is fine: every request carries a JWT that the SDK validates.
-4. **App package:** `pnpm teams:package` writes `heinzel-teams.zip` (manifest v1.19 plus icons, built from `TEAMS_APP_ID` and `BOT_NAME`). Upload it in Teams: *Apps* → *Manage your apps* → *Upload an app* → *Upload a custom app*, then add it to a team. The manifest contains:
+4. **App package:** download it on the admin UI's *Setup* page, or run `pnpm teams:package`, which writes `heinzel-teams.zip` (manifest v1.19 plus icons, built from `TEAMS_APP_ID` and `BOT_NAME`). Upload it in Teams: *Apps* → *Manage your apps* → *Upload an app* → *Upload a custom app*, then add it to a team. The manifest contains:
    - `bots[].botId` = `TEAMS_APP_ID`, scopes `personal`, `team`, `groupChat`.
    - RSC permissions `ChannelMessage.Read.Group` and `ChatMessage.Read.Chat` (`authorization.permissions.resourceSpecific`), so Heinzel receives channel and group chat messages without an @-mention (ambient mode).
    - After a change to the manifest, raise `version` in `package.json` and upload again (*Update*).

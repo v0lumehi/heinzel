@@ -153,6 +153,7 @@ if (config.ADMIN_OIDC_ISSUER || config.ADMIN_DEV_LOGIN) {
       tools: () => ({ builtin: tools().filter((t) => !t.source).map((t) => t.name), servers: mcp.report }),
       oidc,
       runtime,
+      platforms: () => [...adapters.values()].map((a) => ({ platform: a.platform, status: a.status?.() ?? null })),
       log: log.child({ component: "admin" }),
     });
     await admin.listen({ port: config.ADMIN_PORT, host: config.ADMIN_HOST });

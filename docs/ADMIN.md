@@ -4,6 +4,7 @@ A web UI to look after Heinzel: channel settings, team memory, usage, coding ses
 
 | Page | What it does |
 |---|---|
+| Setup | Readiness checklist, connection status per chat platform (last message received), step-by-step guides for Slack and Teams, Slack manifest and Teams app package as downloads |
 | Channels | All channels with activity; per channel: ambient mode, daily limit for unprompted posts, instructions, its memories, coding sessions and change history |
 | Memories | Search across all scopes (channel, organization, person) and delete |
 | Usage | LLM calls and tokens per channel and per day/model (1, 7, 30, 90 days) |

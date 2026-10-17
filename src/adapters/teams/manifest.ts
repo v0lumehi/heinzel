@@ -46,6 +46,17 @@ export function buildManifest(o: ManifestOptions): Record<string, unknown> {
   };
 }
 
+export const APP_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The complete app package (zip) to upload in Teams. */
+export function teamsAppPackage(o: ManifestOptions): Buffer {
+  return zip([
+    { name: "manifest.json", data: Buffer.from(JSON.stringify(buildManifest(o), null, 2)) },
+    { name: "color.png", data: iconPng("color") },
+    { name: "outline.png", data: iconPng("outline") },
+  ]);
+}
+
 /** A square "H" icon: 192 px on the accent color (color icon), or 32 px white on transparent (outline icon). */
 export function iconPng(kind: "color" | "outline"): Buffer {
   const size = kind === "color" ? 192 : 32;

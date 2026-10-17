@@ -1,6 +1,6 @@
 import bolt from "@slack/bolt";
 import type { Logger } from "pino";
-import type { ChatAdapter, ChatEvent, EventHandler, OutboundMessage, SentMessage } from "../../core/types.js";
+import type { ChatAdapter, ChatEvent, EventHandler, OutboundMessage, PlatformStatus, SentMessage } from "../../core/types.js";
 import {
   markdownToMrkdwn,
   mentionedUserIds,
@@ -28,6 +28,8 @@ export class SlackAdapter implements ChatAdapter {
   private me: SlackIdentity | null = null;
   private readonly userNames = new Map<string, string>();
   private readonly channelNames = new Map<string, string | undefined>();
+  private workspace: string | null = null;
+  private connected = false;
 
   constructor(private readonly opts: SlackAdapterOptions) {
     this.app = new App({
@@ -48,6 +50,7 @@ export class SlackAdapter implements ChatAdapter {
     if (!auth.user_id || !auth.bot_id) throw new Error("Slack auth.test did not return a bot identity. Is SLACK_BOT_TOKEN a bot token (xoxb-)?");
     this.me = { botUserId: auth.user_id, botId: auth.bot_id };
     this.userNames.set(auth.user_id, this.opts.botName.replace(/\s+/g, ""));
+    this.workspace = auth.team ?? null;
     this.opts.log.info({ team: auth.team, bot: auth.user }, "slack: authenticated");
 
     const handle = async (raw: SlackMessageLike): Promise<void> => {
@@ -62,11 +65,17 @@ export class SlackAdapter implements ChatAdapter {
     });
 
     await this.app.start();
+    this.connected = true;
     this.opts.log.info("slack: connected via socket mode");
   }
 
   async stop(): Promise<void> {
+    this.connected = false;
     await this.app.stop();
+  }
+
+  status(): PlatformStatus {
+    return { connected: this.connected, detail: this.workspace ? `workspace ${this.workspace}` : null };
   }
 
   async send(m: OutboundMessage): Promise<SentMessage> {

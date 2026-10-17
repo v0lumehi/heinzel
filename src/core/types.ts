@@ -57,6 +57,14 @@ export interface ChatAdapter {
   acknowledge?(channelId: string, messageId: string): Promise<void>;
   /** Optional: replace the text of a message Heinzel sent (live status updates). */
   update?(channelId: string, messageId: string, text: string): Promise<void>;
+  /** Connection state for the admin UI. */
+  status?(): PlatformStatus;
+}
+
+export interface PlatformStatus {
+  connected: boolean;
+  /** e.g. the Slack workspace, or how Teams is reached. */
+  detail: string | null;
 }
 
 export function channelKey(platform: Platform, channelId: string): string {

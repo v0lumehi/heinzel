@@ -110,6 +110,12 @@ export class Store {
     }));
   }
 
+  /** When the last message from people arrived, per platform (to see whether a platform delivers events). */
+  async lastEventPerPlatform(): Promise<Record<string, Date>> {
+    const { rows } = await this.db.query(`SELECT platform, max(sent_at) AS last FROM events WHERE NOT is_self GROUP BY platform`);
+    return Object.fromEntries(rows.map((r) => [r.platform, r.last]));
+  }
+
   // ---------- events ----------
 
   /** Stores an event. Returns null if it was already stored (platforms redeliver events). */

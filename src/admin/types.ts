@@ -139,3 +139,18 @@ export interface McpTestResponse {
   error: string | null;
   tools: { name: string; exposedAs: string | null }[];
 }
+
+export interface SetupCheck {
+  id: string;
+  ok: boolean;
+  level: "required" | "recommended";
+  title: string;
+  hint: string;
+}
+
+export interface SetupResponse {
+  botName: string;
+  platforms: { platform: "slack" | "teams"; configured: boolean; connected: boolean; detail: string | null; lastMessageAt: string | null }[];
+  teams: { appId: string | null; tenantId: string | null; playground: boolean; port: number; packageAvailable: boolean };
+  checks: SetupCheck[];
+}

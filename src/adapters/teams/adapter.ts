@@ -1,7 +1,7 @@
 import http from "node:http";
 import { App, ExpressAdapter, type AppOptions, type IPlugin } from "@microsoft/teams.apps";
 import type { Logger } from "pino";
-import type { ChatAdapter, EventHandler, OutboundMessage, SentMessage } from "../../core/types.js";
+import type { ChatAdapter, EventHandler, OutboundMessage, PlatformStatus, SentMessage } from "../../core/types.js";
 import { isChannelConversation, markdownToTeams, teamsToChatEvent, type TeamsActivityLike } from "./format.js";
 
 type SdkLogger = NonNullable<AppOptions<IPlugin>["logger"]>;
@@ -35,6 +35,7 @@ export class TeamsAdapter implements ChatAdapter {
   /** Learned from incoming activities; the service URL can differ per region and tenant. */
   private readonly serviceUrls = new Map<string, string>();
   private readonly conversationTypes = new Map<string, string>();
+  private listening = false;
 
   constructor(private readonly opts: TeamsAdapterOptions) {
     this.app = new App({
@@ -69,6 +70,7 @@ export class TeamsAdapter implements ChatAdapter {
         resolve();
       });
     });
+    this.listening = true;
     if (this.opts.playground) {
       this.opts.log.warn({ port: this.opts.port }, "teams: playground mode, accepting unauthenticated requests on localhost only");
     } else {
@@ -76,7 +78,13 @@ export class TeamsAdapter implements ChatAdapter {
     }
   }
 
+  status(): PlatformStatus {
+    const mode = this.opts.playground ? "Agents Playground (local test mode)" : `bot ${this.opts.appId}`;
+    return { connected: this.listening, detail: `${mode}, listening on port ${this.opts.port} at /api/messages` };
+  }
+
   async stop(): Promise<void> {
+    this.listening = false;
     const closed = new Promise<void>((resolve) => this.server.close(() => resolve()));
     this.server.closeIdleConnections(); // keep-alive connections from the Bot Connector would hold close() open
     await closed;

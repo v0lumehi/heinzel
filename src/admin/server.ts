@@ -8,7 +8,11 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { Logger } from "pino";
 import { z } from "zod";
+import { readFileSync } from "node:fs";
+import { APP_ID_PATTERN, teamsAppPackage } from "../adapters/teams/manifest.js";
+import { slackManifest } from "../adapters/slack/manifest.js";
 import type { Config } from "../config.js";
+import type { Platform, PlatformStatus } from "../core/types.js";
 import { SettingsError, type RuntimeConfig } from "../core/runtime.js";
 import type { McpServerReport } from "../mcp/hub.js";
 import type { Memory, MemoryStore } from "../memory/memory.js";
@@ -27,6 +31,8 @@ import type {
   MeResponse,
   MemoryRow,
   SettingsResponse,
+  SetupCheck,
+  SetupResponse,
   ToolsResponse,
   UsageResponse,
 } from "./types.js";
@@ -40,6 +46,8 @@ export interface AdminDeps {
   /** Names of the agent tools and the MCP connection report, for the tools page. */
   tools: () => { builtin: string[]; servers: McpServerReport[] };
   oidc?: OidcLogin;
+  /** Connection state of the chat platforms that are configured. */
+  platforms?: () => { platform: Platform; status: PlatformStatus | null }[];
   /** Runtime settings and MCP servers editable in the UI. */
   runtime?: RuntimeConfig;
   log: Logger;
@@ -303,6 +311,84 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
       return { error: r.error ?? null, tools: r.tools };
     });
 
+    // ---------------------------------------------------------------- setup guide
+
+    api.get("/api/setup", async (): Promise<SetupResponse> => {
+      const live = new Map((d.platforms?.() ?? []).map((p) => [p.platform, p.status]));
+      const last = await d.store.lastEventPerPlatform();
+      const platforms = (["slack", "teams"] as const).map((platform) => {
+        const status = live.get(platform);
+        return {
+          platform,
+          configured: live.has(platform),
+          connected: status?.connected ?? false,
+          detail: status?.detail ?? null,
+          lastMessageAt: iso(last[platform]),
+        };
+      });
+      const mcpErrors = d.tools().servers.filter((s) => s.error).map((s) => s.server);
+      const checks: SetupCheck[] = [
+        {
+          id: "platform",
+          ok: platforms.some((p) => p.connected && p.lastMessageAt),
+          level: "required",
+          title: "A chat platform delivers messages",
+          hint: "Connect Slack or Teams below, then write to the bot once.",
+        },
+        {
+          id: "sso",
+          ok: !!config.ADMIN_OIDC_ISSUER,
+          level: "required",
+          title: "Single sign-on for this admin UI",
+          hint: "Set ADMIN_OIDC_ISSUER, ADMIN_OIDC_CLIENT_ID and ADMIN_OIDC_CLIENT_SECRET (docs/ADMIN.md). The development sign-in is for local use only.",
+        },
+        {
+          id: "secrets",
+          ok: !!config.SECRETS_KEY,
+          level: "recommended",
+          title: "Key for stored secrets",
+          hint: "Set SECRETS_KEY (openssl rand -base64 32) so tokens of MCP servers can be stored here.",
+        },
+        {
+          id: "retention",
+          ok: config.EVENTS_RETENTION_DAYS > 0,
+          level: "recommended",
+          title: "Retention for message copies",
+          hint: "Message copies are kept forever. Decide on a retention period (Settings → Data) that fits your data protection policy.",
+        },
+        {
+          id: "tools",
+          ok: mcpErrors.length === 0,
+          level: "recommended",
+          title: "Tool servers reachable",
+          hint: mcpErrors.length ? `Unavailable: ${mcpErrors.join(", ")} (see Tools).` : "All configured MCP servers are connected.",
+        },
+      ];
+      return {
+        botName: config.BOT_NAME,
+        platforms,
+        teams: {
+          appId: config.TEAMS_APP_ID ?? null,
+          tenantId: config.TEAMS_TENANT_ID ?? null,
+          playground: config.TEAMS_PLAYGROUND,
+          port: config.TEAMS_PORT,
+          packageAvailable: !!config.TEAMS_APP_ID && APP_ID_PATTERN.test(config.TEAMS_APP_ID),
+        },
+        checks,
+      };
+    });
+
+    api.get("/api/setup/slack-manifest.yaml", async (_req, reply) =>
+      reply.header("content-type", "text/yaml; charset=utf-8").header("content-disposition", 'attachment; filename="slack-app-manifest.yaml"').send(slackManifest(config.BOT_NAME)),
+    );
+
+    api.get("/api/setup/teams-app.zip", async (_req, reply) => {
+      const appId = config.TEAMS_APP_ID;
+      if (!appId || !APP_ID_PATTERN.test(appId)) return reply.code(409).send({ error: "Set TEAMS_APP_ID to the bot's Microsoft App ID first" });
+      const pkg = teamsAppPackage({ appId, botName: config.BOT_NAME, version: APP_VERSION });
+      return reply.header("content-type", "application/zip").header("content-disposition", 'attachment; filename="heinzel-teams.zip"').send(pkg);
+    });
+
     api.get("/api/audit", async (req): Promise<AuditRow[]> => (await d.store.listAudit({ target: (req.query as { target?: string }).target || undefined, limit: 500 })).map(auditRow));
   });
 
@@ -322,6 +408,8 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
 
   return app;
 }
+
+const APP_VERSION = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
 
 function csrfOk(req: FastifyRequest): boolean {
   const sent = req.headers["x-csrf-token"];

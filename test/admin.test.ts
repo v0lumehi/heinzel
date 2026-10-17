@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { roleFromClaims } from "../src/admin/auth.js";
 import { buildAdminServer } from "../src/admin/server.js";
-import type { ChannelDetailResponse, ChannelRow, MeResponse } from "../src/admin/types.js";
+import type { ChannelDetailResponse, ChannelRow, MeResponse, SetupResponse } from "../src/admin/types.js";
 import type { Db } from "../src/db/pool.js";
 import { MemoryStore } from "../src/memory/memory.js";
 import { AdminSessionStore } from "../src/store/admin.js";
@@ -43,6 +43,7 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
       memory,
       sessions,
       tools: () => ({ builtin: ["remember"], servers: [{ server: "search", tools: [{ name: "searxng_web_search", exposedAs: "search__searxng_web_search" }] }] }),
+      platforms: () => [{ platform: "slack", status: { connected: true, detail: "workspace test" } }],
       log: silentLog,
       staticDir,
     });
@@ -127,11 +128,33 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
     expect((await app.inject({ url: "/api/channels", headers: { cookie } })).statusCode).toBe(401);
   });
 
+  it("reports setup status and serves the Slack manifest; the Teams package needs TEAMS_APP_ID", async () => {
+    const { cookie } = await signIn();
+    const setup = (await app.inject({ url: "/api/setup", headers: { cookie } })).json<SetupResponse>();
+    expect(setup.platforms.map((p) => [p.platform, p.configured])).toEqual([["slack", true], ["teams", false]]);
+    expect(setup.platforms[0]!.lastMessageAt).not.toBeNull();
+    expect(setup.checks.find((c) => c.id === "sso")).toMatchObject({ ok: false, level: "required" });
+    const manifest = await app.inject({ url: "/api/setup/slack-manifest.yaml", headers: { cookie } });
+    expect(manifest.headers["content-disposition"]).toContain("attachment");
+    expect(manifest.body).toContain("socket_mode_enabled: true");
+    expect((await app.inject({ url: "/api/setup/teams-app.zip", headers: { cookie } })).statusCode).toBe(409);
+    expect((await app.inject({ url: "/api/setup/slack-manifest.yaml" })).statusCode).toBe(401);
+  });
+
   it("serves the web UI for client-side routes, with security headers", async () => {
     const res = await app.inject({ url: "/channels/slack%3AC1" });
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("app shell");
     expect(res.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect((await app.inject({ url: "/api/nope" })).statusCode).toBe(404);
+  });
+});
+
+describe("slack manifest", () => {
+  it("matches slack-app-manifest.yaml for the default name, so the two cannot drift apart", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { slackManifest } = await import("../src/adapters/slack/manifest.js");
+    expect(slackManifest("Heinzel")).toBe(readFileSync(new URL("../slack-app-manifest.yaml", import.meta.url), "utf8"));
+    expect(slackManifest("Team Bot")).toContain("display_name: Team Bot");
   });
 });

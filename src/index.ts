@@ -1,4 +1,6 @@
 import pino from "pino";
+import { OidcLogin } from "./admin/auth.js";
+import { buildAdminServer } from "./admin/server.js";
 import { defaultTools, type AgentTool } from "./agent/tools.js";
 import { createWebFetchTool } from "./agent/webfetch.js";
 import { DockerRunner } from "./coding/docker.js";
@@ -15,6 +17,7 @@ import { McpHub } from "./mcp/hub.js";
 import { MemoryStore } from "./memory/memory.js";
 import { JobQueue } from "./queue/queue.js";
 import { Worker } from "./queue/worker.js";
+import { AdminSessionStore } from "./store/admin.js";
 import { CodingStore } from "./store/coding.js";
 import { Store } from "./store/store.js";
 
@@ -102,6 +105,35 @@ for (const adapter of adapters.values()) {
     process.exit(1);
   }
 }
+let admin: Awaited<ReturnType<typeof buildAdminServer>> | undefined;
+if (config.ADMIN_OIDC_ISSUER || config.ADMIN_DEV_LOGIN) {
+  try {
+    const oidc = config.ADMIN_OIDC_ISSUER
+      ? await OidcLogin.discover({
+          issuer: config.ADMIN_OIDC_ISSUER,
+          clientId: config.ADMIN_OIDC_CLIENT_ID!,
+          clientSecret: config.ADMIN_OIDC_CLIENT_SECRET!,
+          redirectUri: new URL("/auth/callback", config.ADMIN_PUBLIC_URL).href,
+        })
+      : undefined;
+    admin = await buildAdminServer({
+      config,
+      store,
+      memory,
+      sessions: new AdminSessionStore(db),
+      coding: coding?.sessions,
+      tools: () => ({ builtin: tools.filter((t) => !t.source).map((t) => t.name), servers: mcp.report }),
+      oidc,
+      log: log.child({ component: "admin" }),
+    });
+    await admin.listen({ port: config.ADMIN_PORT, host: config.ADMIN_HOST });
+    log.info({ url: config.ADMIN_PUBLIC_URL, sso: !!oidc, devLogin: config.ADMIN_DEV_LOGIN }, "admin UI is running");
+  } catch (err) {
+    // Heinzel keeps working in chat without its admin UI.
+    log.error({ err }, "admin UI could not start");
+  }
+}
+
 log.info({ platforms: [...adapters.keys()], mcpServers: mcp.servers, coding: !!engine.coding, agentModel: config.LLM_MODEL_AGENT, triageModel: config.LLM_MODEL_TRIAGE }, `${config.BOT_NAME} is running`);
 
 async function housekeeping(): Promise<void> {
@@ -129,6 +161,7 @@ async function shutdown(signal: string): Promise<void> {
   const force = setTimeout(() => process.exit(1), 15_000);
   force.unref();
   for (const a of adapters.values()) await a.stop().catch((err) => log.warn({ err }, "adapter stop failed"));
+  await admin?.close().catch((err) => log.warn({ err }, "admin UI stop failed"));
   await worker.stop();
   await mcp.stop();
   await db.end();

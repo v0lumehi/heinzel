@@ -9,6 +9,7 @@ An open-source, self-hosted AI teammate for team chat. Tag `@Heinzel` and it wor
 - **Team memory.** Remembers decisions, owners and conventions per channel, company-wide and per person — in your own Postgres.
 - **Tools.** Reads web pages out of the box; self-hosted web search (SearXNG), GitLab, Jira and any other [MCP](https://modelcontextprotocol.io) server via a config file. See [docs/TOOLS.md](docs/TOOLS.md).
 - **Coding sessions.** Hand a coding task to OpenCode in an isolated container in your infrastructure; it opens a draft merge request. See [docs/CODING.md](docs/CODING.md).
+- **Admin UI.** Channel settings, team memory, usage, coding sessions and an audit log, with single sign-on (Entra ID or any OIDC provider). See [docs/ADMIN.md](docs/ADMIN.md).
 - **Self-hosted.** One Node process plus Postgres. No vendor cloud in the middle.
 
 > Status: early MVP. Slack works end to end; Teams works in the Agents Playground, a real tenant is next ([docs/TEAMS.md](docs/TEAMS.md)). See [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -67,6 +68,8 @@ Requirements: Node 22+, pnpm, Docker (or any Postgres 14+), a Requesty API key.
 7. **Try it:** invite the bot to a channel (`/invite @Heinzel`), then `@Heinzel !help`, ask it something, or `@Heinzel !ambient on`.
 
 Socket Mode means no public URL is needed — it runs fine from a laptop.
+
+**Admin UI:** `pnpm build:web`, set `ADMIN_DEV_LOGIN=true`, restart, open http://localhost:3080. Single sign-on: [docs/ADMIN.md](docs/ADMIN.md).
 
 **Microsoft Teams:** set `TEAMS_PLAYGROUND=true` and try it locally in the Microsoft 365 Agents Playground, no tenant needed. Setup for a real tenant: [docs/TEAMS.md](docs/TEAMS.md).
 

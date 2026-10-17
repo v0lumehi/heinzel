@@ -1,6 +1,8 @@
-node_modules
-dist
+**/node_modules
+**/dist
 .env
 .git
 .pgdata
 coverage
+mcp.json
+heinzel-teams.zip

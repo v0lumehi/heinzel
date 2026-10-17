@@ -78,6 +78,31 @@ export class MemoryStore {
     return rows.map(toMemory);
   }
 
+  /** Admin listing across all scopes, optionally filtered; newest first. Channel memories carry the channel name. */
+  async list(q: { id?: number; scope?: MemoryScope; scopeKey?: string; text?: string; limit?: number } = {}): Promise<(Memory & { channelName: string | null })[]> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (q.id !== undefined) where.push(`m.id = $${params.push(q.id)}`);
+    if (q.scope) where.push(`m.scope = $${params.push(q.scope)}`);
+    if (q.scopeKey) where.push(`m.scope_key = $${params.push(q.scopeKey)}`);
+    const text = (q.text ?? "").trim();
+    if (text) where.push(`m.content ILIKE $${params.push(`%${text.replace(/[\\%_]/g, "\\$&")}%`)}`);
+    const { rows } = await this.db.query(
+      `SELECT m.*, c.name AS channel_name FROM memories m
+       LEFT JOIN channels c ON m.scope = 'channel' AND c.channel_key = m.scope_key
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY m.created_at DESC, m.id DESC LIMIT $${params.push(q.limit ?? 200)}`,
+      params,
+    );
+    return rows.map((r) => ({ ...toMemory(r), channelName: r.channel_name }));
+  }
+
+  /** Deletes a memory regardless of scope (admin). */
+  async remove(id: number): Promise<boolean> {
+    const res = await this.db.query(`DELETE FROM memories WHERE id = $1`, [id]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
   async forget(id: number, scopes: { scope: MemoryScope; scopeKey: string }[]): Promise<boolean> {
     // Only allow deleting memories visible in the caller's scopes.
     const visible = await this.search({ scopes, limit: 10_000 });

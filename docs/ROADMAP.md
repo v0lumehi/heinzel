@@ -5,6 +5,7 @@
 - Slack adapter (Socket Mode): mentions, DMs, threads, 👀 acknowledgement, Slack ⇄ markdown conversion
 - Live test with a real Slack workspace and Requesty, including coding sessions
 - Microsoft Teams adapter (Teams SDK v2, HTTP endpoint), verified with the Microsoft 365 Agents Playground (docs/TEAMS.md)
+- Admin UI (docs/ADMIN.md): OIDC single sign-on with admin/viewer roles, channel settings, memories, usage, coding sessions, tools overview, audit log (also for chat commands)
 - Engine with durable Postgres job queue (retries, backoff, stale-job recovery, dedupe keys)
 - Agent tool loop on any OpenAI-compatible gateway, Requesty metadata for cost attribution
 - Ambient mode per channel: rule pre-filter → triage model → budgeted reply
@@ -49,8 +50,10 @@ The adapter exists (docs/TEAMS.md); what is left needs a tenant:
 - Admin view/edit of memories.
 
 ### 6. Admin UI and governance
-- Small web UI: channels, settings, memories, usage/costs, audit log.
-- Org-wide limits (token budget per day), kill switch.
+- Manage MCP servers in the UI: remote servers only, encrypted secrets, OAuth sign-in, test connection, hot reload; per-channel tool allowlist.
+- Permissions for chat commands (channel owners / admin group).
+- Delete and export everything about one person (GDPR).
+- Org-wide limits (token budget per day), kill switch, costs in currency.
 
 ## Open decisions
 

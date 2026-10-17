@@ -94,6 +94,24 @@ const schema = z.object({
   CODING_MEMORY_MB: z.coerce.number().int().min(512).default(4096),
   CODING_CPUS: z.coerce.number().min(0.5).max(64).default(2),
 
+  // --- Admin UI (see docs/ADMIN.md; enabled when ADMIN_OIDC_ISSUER is set or ADMIN_DEV_LOGIN=true) ---
+  ADMIN_PORT: z.coerce.number().int().min(1).max(65535).default(3080),
+  /** Interface to listen on. 127.0.0.1 keeps it local; use 0.0.0.0 in a container behind a reverse proxy. */
+  ADMIN_HOST: z.string().default("127.0.0.1"),
+  /** Public base URL of the admin UI, used for the OIDC redirect (https in production). */
+  ADMIN_PUBLIC_URL: z.string().url().default("http://localhost:3080"),
+  /** OpenID Connect provider, e.g. https://login.microsoftonline.com/<tenant id>/v2.0 for Entra ID. */
+  ADMIN_OIDC_ISSUER: optionalString,
+  ADMIN_OIDC_CLIENT_ID: optionalString,
+  ADMIN_OIDC_CLIENT_SECRET: optionalString,
+  /** ID token claim that carries roles or groups, and the values that map to admin / viewer (comma-separated). */
+  ADMIN_ROLE_CLAIM: z.string().default("roles"),
+  ADMIN_ADMIN_ROLES: z.string().default("Heinzel.Admin"),
+  ADMIN_VIEWER_ROLES: z.string().default("Heinzel.Viewer"),
+  /** Local development only: a sign-in button without identity provider. Requires ADMIN_HOST to be a loopback address. */
+  ADMIN_DEV_LOGIN: bool.default(false),
+  ADMIN_SESSION_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(12),
+
   // --- Behaviour ---
   BOT_NAME: z.string().default("Heinzel"),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
@@ -137,6 +155,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         for (const key of ["TEAMS_APP_PASSWORD", "TEAMS_TENANT_ID"] as const) {
           if (!c[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when TEAMS_APP_ID is set" });
         }
+      }
+      if (c.ADMIN_OIDC_ISSUER) {
+        for (const key of ["ADMIN_OIDC_CLIENT_ID", "ADMIN_OIDC_CLIENT_SECRET"] as const) {
+          if (!c[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when ADMIN_OIDC_ISSUER is set" });
+        }
+      }
+      if (c.ADMIN_DEV_LOGIN && !["127.0.0.1", "::1", "localhost"].includes(c.ADMIN_HOST)) {
+        ctx.addIssue({ code: "custom", path: ["ADMIN_DEV_LOGIN"], message: "only allowed when ADMIN_HOST is a loopback address" });
       }
       if (!c.CODING_ENABLED) return;
       for (const key of ["GITLAB_URL", "CODING_GIT_TOKEN"] as const) {

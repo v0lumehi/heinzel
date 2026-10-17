@@ -18,6 +18,30 @@ export interface StoredEvent extends ChatEvent {
 
 export type BotPostKind = "reply" | "ambient" | "followup";
 
+/** A channel with activity figures, for the admin UI. */
+export interface ChannelOverview extends ChannelSettings {
+  unsolicitedLast24h: number;
+  callsLast7d: number;
+  tokensLast7d: number;
+  lastActivity: Date | null;
+}
+
+export interface AuditEntry {
+  id: number;
+  actor: string;
+  actorName: string | null;
+  action: string;
+  target: string | null;
+  details: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface UsageRow {
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
 /** Thin data-access layer. All SQL outside migrations and the queue lives here or in memory/. */
 export class Store {
   constructor(private readonly db: Db) {}
@@ -62,6 +86,28 @@ export class Store {
     );
     if (!rows[0]) throw new Error(`Unknown channel ${key}`);
     return toChannel(rows[0]);
+  }
+
+  /** All channels with activity figures, most recently active first. */
+  async listChannels(): Promise<ChannelOverview[]> {
+    const { rows } = await this.db.query(
+      `SELECT c.*,
+         (SELECT count(*) FROM bot_posts b WHERE b.channel_key = c.channel_key AND b.kind IN ('ambient', 'followup')
+            AND b.created_at > now() - interval '24 hours') AS unsolicited,
+         u.calls, u.tokens,
+         (SELECT max(sent_at) FROM events e WHERE e.channel_key = c.channel_key) AS last_activity
+       FROM channels c
+       LEFT JOIN LATERAL (SELECT count(*) AS calls, COALESCE(sum(prompt_tokens + completion_tokens), 0) AS tokens FROM llm_usage l
+                          WHERE l.channel_key = c.channel_key AND l.created_at > now() - interval '7 days') u ON true
+       ORDER BY last_activity DESC NULLS LAST, c.channel_key`,
+    );
+    return rows.map((r) => ({
+      ...toChannel(r),
+      unsolicitedLast24h: Number(r.unsolicited),
+      callsLast7d: Number(r.calls),
+      tokensLast7d: Number(r.tokens),
+      lastActivity: r.last_activity,
+    }));
   }
 
   // ---------- events ----------
@@ -169,6 +215,32 @@ export class Store {
     return { events, jobs: jobs.rowCount ?? 0 };
   }
 
+  // ---------- audit ----------
+
+  async recordAudit(a: { actor: string; actorName?: string | null; action: string; target?: string | null; details?: Record<string, unknown> }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO audit_log (actor, actor_name, action, target, details) VALUES ($1, $2, $3, $4, $5)`,
+      [a.actor, a.actorName ?? null, a.action, a.target ?? null, JSON.stringify(a.details ?? {})],
+    );
+  }
+
+  /** Newest first, optionally for one target (e.g. a channel key). */
+  async listAudit(q: { target?: string; limit?: number } = {}): Promise<AuditEntry[]> {
+    const { rows } = await this.db.query(
+      `SELECT * FROM audit_log WHERE ($1::text IS NULL OR target = $1) ORDER BY created_at DESC, id DESC LIMIT $2`,
+      [q.target ?? null, q.limit ?? 200],
+    );
+    return rows.map((r) => ({
+      id: Number(r.id),
+      actor: r.actor,
+      actorName: r.actor_name,
+      action: r.action,
+      target: r.target,
+      details: r.details,
+      createdAt: r.created_at,
+    }));
+  }
+
   // ---------- usage ----------
 
   async recordUsage(u: {
@@ -195,6 +267,30 @@ export class Store {
     return Number(rows[0]?.n ?? 0);
   }
 
+  /** LLM usage of the last `days` days per day, model and purpose, newest day first. */
+  async usageByDay(days: number): Promise<(UsageRow & { day: string; model: string; purpose: string })[]> {
+    const { rows } = await this.db.query(
+      `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day, model, purpose,
+              count(*) AS calls, sum(prompt_tokens) AS p, sum(completion_tokens) AS c
+       FROM llm_usage WHERE created_at > now() - make_interval(days => $1)
+       GROUP BY 1, 2, 3 ORDER BY 1 DESC, 4 DESC`,
+      [days],
+    );
+    return rows.map((r) => ({ day: r.day, model: r.model, purpose: r.purpose, ...toUsage(r) }));
+  }
+
+  /** LLM usage of the last `days` days per channel, biggest first. Calls without a channel have key null. */
+  async usageByChannel(days: number): Promise<(UsageRow & { channelKey: string | null; name: string | null })[]> {
+    const { rows } = await this.db.query(
+      `SELECT l.channel_key, c.name, count(*) AS calls, sum(l.prompt_tokens) AS p, sum(l.completion_tokens) AS c
+       FROM llm_usage l LEFT JOIN channels c ON c.channel_key = l.channel_key
+       WHERE l.created_at > now() - make_interval(days => $1)
+       GROUP BY 1, 2 ORDER BY sum(l.prompt_tokens + l.completion_tokens) DESC`,
+      [days],
+    );
+    return rows.map((r) => ({ channelKey: r.channel_key, name: r.name, ...toUsage(r) }));
+  }
+
   async usageLast24h(key: string): Promise<{ calls: number; promptTokens: number; completionTokens: number }> {
     const { rows } = await this.db.query(
       `SELECT count(*) AS calls, COALESCE(sum(prompt_tokens),0) AS p, COALESCE(sum(completion_tokens),0) AS c
@@ -217,6 +313,10 @@ function toChannel(r: any): ChannelSettings {
     instructions: r.instructions,
     dailyUnsolicitedLimit: r.daily_unsolicited_limit,
   };
+}
+
+function toUsage(r: any): UsageRow {
+  return { calls: Number(r.calls), promptTokens: Number(r.p ?? 0), completionTokens: Number(r.c ?? 0) };
 }
 
 function toEvent(r: any): StoredEvent {

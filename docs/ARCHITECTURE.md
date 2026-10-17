@@ -25,6 +25,8 @@ Heinzel is a single Node.js process (TypeScript, ESM) plus Postgres. It can be s
 |---|---|
 | `src/core/types.ts` | Platform-neutral `ChatEvent`, `ChatAdapter` interface, channel keys |
 | `src/core/engine.ts` | The brain: ingest, routing, job handlers, posting, budgets |
+| `src/admin/` | Admin UI backend (Fastify): OIDC sign-in, sessions, JSON API, serves the built UI; `types.ts` is shared with `web/` |
+| `web/` | Admin UI frontend: React + Vite + Mantine + TanStack Query (pnpm workspace package) |
 | `src/core/commands.ts` | `!`-prefixed admin commands (no LLM involved) |
 | `src/adapters/slack/` | Bolt + Socket Mode; Slack wire format ⇄ plain text / mrkdwn |
 | `src/adapters/teams/` | Teams SDK v2 behind an HTTP endpoint (`/api/messages`); activities ⇄ plain text / markdown (docs/TEAMS.md) |

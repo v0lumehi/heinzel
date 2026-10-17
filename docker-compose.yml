@@ -28,6 +28,12 @@ services:
       SEARCH_MCP_URL: http://mcp-searxng:3000/mcp
       # Coding sessions talk to Docker through the filtered proxy, never the raw socket.
       DOCKER_HOST: tcp://docker-proxy:2375
+      # Admin UI and Teams endpoint listen inside the container; the ports below publish them on localhost only.
+      # Put a TLS reverse proxy (or a dev tunnel) in front for access from outside.
+      ADMIN_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:3080:3080"
+      - "127.0.0.1:3978:3978"
     depends_on:
       postgres:
         condition: service_healthy

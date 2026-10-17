@@ -333,6 +333,11 @@ export class Engine {
         reply = `I don't know that command.\n${helpText(config.BOT_NAME)}`;
         break;
     }
+    if (cmd.kind === "ambient" || cmd.kind === "limit" || cmd.kind === "instructions-set" || cmd.kind === "instructions-clear") {
+      await store
+        .recordAudit({ actor: `${ev.platform}:${ev.userId}`, actorName: ev.userName, action: "channel.update", target: channel.channelKey, details: { command: cmd } })
+        .catch((err) => this.d.log.warn({ err }, "failed to record audit entry"));
+    }
     await this.post(channel, ev, reply, "reply");
   }
 

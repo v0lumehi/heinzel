@@ -97,6 +97,12 @@ export class CodingStore {
     return rows.map(toSession);
   }
 
+  /** Most recent sessions across all channels (admin UI). */
+  async recent(limit = 100): Promise<CodingSession[]> {
+    const { rows } = await this.db.query(`SELECT * FROM coding_sessions ORDER BY id DESC LIMIT $1`, [limit]);
+    return rows.map(toSession);
+  }
+
   async active(): Promise<CodingSession[]> {
     const { rows } = await this.db.query(`SELECT * FROM coding_sessions WHERE status = ANY($1) ORDER BY id`, [ACTIVE_STATUSES]);
     return rows.map(toSession);

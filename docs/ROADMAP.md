@@ -28,7 +28,7 @@
 - Check how the chosen models handle the `SILENT` convention and tool calls through Requesty.
 
 ### 2. Microsoft Teams in a real tenant
-The adapter exists (docs/TEAMS.md); what is left needs a tenant:
+The adapter exists (docs/TEAMS.md). What is left needs a tenant:
 - Azure Bot registration, dev tunnel, app manifest with RSC permissions `ChannelMessage.Read.Group` / `ChatMessage.Read.Chat`.
 - Verify auth, channel threads, ambient mode, 👀 reactions, markdown rendering, proactive posts after a restart.
 - `fetchThread` / `fetchRecent` through Microsoft Graph (today the engine uses its stored history).
@@ -36,15 +36,15 @@ The adapter exists (docs/TEAMS.md); what is left needs a tenant:
 - If the global service URL fallback is not reliable: store it per channel (`platform_refs` on `channels`).
 
 ### 3. Coding sessions, next
-- Live test against a real GitLab (push options → draft MR; protected branches).
+- Live test against a real GitLab (push options → draft MR, protected branches).
 - GitLab Duo Agent Platform as a second backend for customers who use DAP (sessions run on their GitLab runners).
 - Continue a session in the same thread ("also add a test") instead of starting a new one.
 
 ### 4. More from tools
-- Live-test the GitLab and Atlassian Rovo MCP servers; check the curated `tools` list against the real tool names.
+- Live-test the GitLab and Atlassian Rovo MCP servers. Check the curated `tools` list against the real tool names.
 - Per-channel allowlist of tool servers (column on `channels`, chat command). Today every channel gets every tool.
 - OAuth login for MCP servers that require it (e.g. GitLab's official server): one-time `pnpm mcp:login <server>` with the SDK's OAuth client, refresh tokens stored encrypted in Postgres, re-login hint on failure. Use a dedicated bot account.
-- MCP `tools/list_changed` notifications (servers from the admin UI already reload live; `mcp.json` needs a restart).
+- MCP `tools/list_changed` notifications (servers from the admin UI already reload live, while `mcp.json` needs a restart).
 
 ### 5. Memory quality
 - Nightly consolidation job: merge duplicates, drop stale facts, summarize channels.
@@ -52,21 +52,21 @@ The adapter exists (docs/TEAMS.md); what is left needs a tenant:
 - Admin view/edit of memories.
 
 ### 6. Admin UI and governance
-- OAuth sign-in for MCP servers; per-channel tool allowlist.
+- OAuth sign-in for MCP servers. Per-channel tool allowlist.
 - Permissions for chat commands (channel owners / admin group).
 - Delete and export everything about one person (GDPR).
 - Org-wide limits (token budget per day), kill switch, costs in currency.
 
 ## Open decisions
 
-- **Data retention** — not decided yet. Message copies (`events`) are kept forever by default; set `EVENTS_RETENTION_DAYS` once a policy exists. Memories are kept independently of events.
+- **Data retention** — not decided yet. Message copies (`events`) are kept forever by default. Set `EVENTS_RETENTION_DAYS` once a policy exists. Memories are kept independently of events.
 
 ## Known limitations
 
 - Memory search is keyword-based (Postgres full-text, `simple` config): synonyms are not matched.
 - No streaming: answers are posted once complete.
 - Slack name/channel lookups are cached in memory per process and never refreshed.
-- Teams: no history from before Heinzel joined (no Graph yet); `@Name` in replies does not notify the person.
+- Teams: no history from before Heinzel joined (no Graph yet), and `@Name` in replies does not notify the person.
 - Edits and deletions of messages are ignored (the stored copy keeps the original text).
 - File contents and images are not read (also PDFs via web fetch).
-- All tool schemas go with every agent call; large MCP servers cost thousands of tokens per call unless `tools` is narrowed.
+- All tool schemas go with every agent call. Large MCP servers cost thousands of tokens per call unless `tools` is narrowed.

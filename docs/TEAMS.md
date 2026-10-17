@@ -12,7 +12,7 @@ The Playground emulates Teams in the browser. You need no Azure account, no tena
 # .env
 TEAMS_PLAYGROUND=true        # no credentials, unauthenticated requests, listens on 127.0.0.1 only
 
-pnpm dev                     # Slack can stay configured; both adapters run side by side
+pnpm dev                     # Slack can stay configured. Both adapters run side by side
 npx @microsoft/m365agentsplayground -e http://localhost:3978/api/messages -c msteams
 ```
 
@@ -21,7 +21,7 @@ The Playground opens at http://localhost:56150. Write to Heinzel like in a DM: `
 Never set `TEAMS_PLAYGROUND=true` in production: the endpoint then accepts requests without checking that they come from Microsoft.
 
 Limits of the Playground:
-- No 👀 reaction (the Playground answers 404; Heinzel ignores it).
+- No 👀 reaction (the Playground answers 404, and Heinzel ignores it).
 - No Graph, no RSC permissions, no app manifest. Ambient mode in channels can only be tested in a real tenant.
 
 For scripted tests there is the headless client `@microsoft/m365agentsplayground-cli` (`TestClient.sendMessage()`).
@@ -29,7 +29,7 @@ For scripted tests there is the headless client `@microsoft/m365agentsplayground
 ## Real tenant (next step)
 
 1. **Tenant:** one where you are admin and custom apps may be uploaded (Teams admin center → *Teams apps* → *Setup policies* / *Org-wide app settings*). A Microsoft 365 Business Basic trial works.
-2. **Azure Bot:** in the Azure portal create an *Azure Bot* resource (type *Single Tenant*, plan F0). It creates an app registration; add a client secret.
+2. **Azure Bot:** in the Azure portal create an *Azure Bot* resource (type *Single Tenant*, plan F0). It creates an app registration. Add a client secret.
    - `TEAMS_APP_ID` = Microsoft App ID, `TEAMS_APP_PASSWORD` = client secret, `TEAMS_TENANT_ID` = directory (tenant) id.
    - *Channels* → add *Microsoft Teams*.
    - *Configuration* → messaging endpoint `https://<public host>/api/messages`.
@@ -59,5 +59,5 @@ For scripted tests there is the headless client `@microsoft/m365agentsplayground
 
 - Verify in a real tenant: auth, threads in channels, RSC / ambient mode, reactions, markdown rendering, proactive posts after a restart.
 - History through Microsoft Graph (`fetchThread` / `fetchRecent`) for messages from before Heinzel joined.
-- Real @-mentions in replies (`<at>` plus mention entity); today `@Name` stays plain text.
+- Real @-mentions in replies (`<at>` plus mention entity). Today `@Name` stays plain text.
 - Store the service URL per channel (`platform_refs` on `channels`) if the global fallback turns out to be unreliable.

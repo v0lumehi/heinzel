@@ -28,9 +28,9 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit together
 
 ## Making a change
 
-- **Keep adapters thin.** Slack and Teams code only translates; behaviour belongs in `src/core/engine.ts`.
-- **SQL lives in `src/store`, `src/memory`, `src/queue` and migrations.** Schema changes are a new numbered file in `src/db/migrations/`; never edit one that was released.
-- **Tests:** pure logic gets unit tests; engine behaviour is tested end to end in `test/engine.test.ts` with the fake LLM and adapter. New code comes with tests; CI reports coverage.
+- **Keep adapters thin.** Slack and Teams code only translates. Behaviour belongs in `src/core/engine.ts`.
+- **SQL lives in `src/store`, `src/memory`, `src/queue` and migrations.** Schema changes are a new numbered file in `src/db/migrations/`. Never edit one that was released.
+- **Tests:** pure logic gets unit tests. Engine behaviour is tested end to end in `test/engine.test.ts` with the fake LLM and adapter. New code comes with tests. CI reports coverage.
 - **Dependencies:** pin an exact version that is at least two weeks old, and explain in the PR why it is needed.
 - **Docs:** update the docs and `.env.example` in the same PR when behaviour or configuration changes, and add a line under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) for anything users notice.
 - **Code, comments and docs in English.**

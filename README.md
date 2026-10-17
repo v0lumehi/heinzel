@@ -31,27 +31,27 @@
 
 ## Why Heinzel
 
-- **Your infrastructure, your data.** One container plus Postgres. Messages, memories and settings stay in your database; only the LLM call leaves, through the gateway you choose.
+- **Your infrastructure, your data.** One container plus Postgres. Messages, memories and settings stay in your database. Only the LLM call leaves, through the gateway you choose.
 - **Slack and Teams.** One product for both, so mixed or merging organisations get the same teammate everywhere.
-- **Proactive, but polite.** Ambient mode is off by default and set per channel. A small model decides whether to speak; budgets and cooldowns cap unprompted posts.
+- **Proactive, but polite.** Ambient mode is off by default and set per channel. A small model decides whether to speak. Budgets and cooldowns cap unprompted posts.
 - **Any model.** Any OpenAI-compatible gateway (defaults to the [Requesty](https://requesty.ai) EU gateway). A small model triages, a mid-size model answers, an optional strong model takes hard tasks.
 - **Team memory.** Remembers decisions, owners and conventions per channel, organisation-wide and per person.
 - **Your tools.** Web pages, self-hosted search (SearXNG), GitLab, Jira, Confluence and any other [MCP](https://modelcontextprotocol.io) server.
-- **Coding sessions.** Hands a task to a coding agent in an isolated container or Kubernetes Job in your infrastructure; the result is a draft merge request.
-- **Built for operations.** Admin UI with single sign-on, roles and audit log; Helm chart; signed multi-arch images with SBOM.
+- **Coding sessions.** Hands a task to a coding agent in an isolated container or Kubernetes Job in your infrastructure. The result is a draft merge request.
+- **Built for operations.** Admin UI with single sign-on, roles and audit log. Helm chart. Signed multi-arch images with SBOM.
 
-> **Status:** early. Tested with a real Slack workspace and a Microsoft Teams test tenant; not yet run in production. See the [roadmap](docs/ROADMAP.md).
+> **Status:** early. Tested with a real Slack workspace and a Microsoft Teams test tenant. Not yet run in production. See the [roadmap](docs/ROADMAP.md).
 
 ## How it behaves
 
 | Situation | What Heinzel does |
 |---|---|
 | Someone tags `@Heinzel` or writes to it directly | Reacts with 👀, reads the thread (or recent history), answers in the thread |
-| Someone replies in a thread Heinzel took part in | Decides whether the reply is meant for it; answers if so |
-| Ambient mode is on and nobody tagged Heinzel | Mostly stays quiet; may remember a fact, schedule a follow-up, or speak up |
+| Someone replies in a thread Heinzel took part in | Decides whether the reply is meant for it. Answers if so |
+| Ambient mode is on and nobody tagged Heinzel | Mostly stays quiet. May remember a fact, schedule a follow-up, or speak up |
 | A question stays open or someone promises something | Schedules a follow-up and checks back later |
 | A task is hard | Hands over to the strong model, within a daily budget |
-| Someone asks for a code change | Proposes a coding session; it starts after the requester confirms with `!go` |
+| Someone asks for a code change | Proposes a coding session. It starts after the requester confirms with `!go` |
 
 Chat commands (mention Heinzel first): `!status`, `!ambient on|off`, `!limit <n>`, `!instructions <text>`, `!memories [query]`, `!deep <question>`, `!go` / `!stop` / `!coding`, `!help`.
 
@@ -99,7 +99,7 @@ The **admin UI** runs on http://localhost:3080 (`ADMIN_DEV_LOGIN=true` for a loc
 | Kubernetes | Helm chart `oci://ghcr.io/v0lumehi/charts/heinzel`: non-root, read-only root filesystem, probes, ingress, coding Jobs with RBAC, egress proxy and NetworkPolicy. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
 | Docker Compose | `docker compose --profile app up -d` for a single machine |
 | Images | `ghcr.io/v0lumehi/heinzel`, `ghcr.io/v0lumehi/heinzel-coder` — amd64 and arm64, signed with cosign, with SBOM and provenance. [SECURITY.md](SECURITY.md) |
-| Upgrades | Migrations run at startup; [CHANGELOG.md](CHANGELOG.md) says when you need to act |
+| Upgrades | Migrations run at startup. [CHANGELOG.md](CHANGELOG.md) says when you need to act |
 
 ## Documentation
 
@@ -117,7 +117,7 @@ The **admin UI** runs on http://localhost:3080 (`ADMIN_DEV_LOGIN=true` for a loc
 
 ## Contributing
 
-Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); coding agents also read [AGENTS.md](AGENTS.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Coding agents also read [AGENTS.md](AGENTS.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

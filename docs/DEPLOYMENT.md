@@ -43,27 +43,27 @@ ingress:
   teams: { enabled: true, host: heinzel-teams.example.com, tlsSecretName: heinzel-teams-tls }
 ```
 
-Models, limits and HTTP MCP servers can also be managed in the admin UI; to keep them in Git only, set `LOCKED_SETTINGS: "*"` under `config` (docs/ADMIN.md). All settings are the environment variables from `.env.example`: non-secret ones under `config`, secret ones in the Secret. MCP servers go under `mcp` (the content of `mcp.json`). See `deploy/helm/heinzel/values.yaml` for everything else (replicas, resources, NetworkPolicy, scheduling).
+Models, limits and HTTP MCP servers can also be managed in the admin UI. To keep them in Git only, set `LOCKED_SETTINGS: "*"` under `config` (docs/ADMIN.md). All settings are the environment variables from `.env.example`: non-secret ones under `config`, secret ones in the Secret. MCP servers go under `mcp` (the content of `mcp.json`). See `deploy/helm/heinzel/values.yaml` for everything else (replicas, resources, NetworkPolicy, scheduling).
 
 What the chart does for you:
-- Non-root, read-only root filesystem, no capabilities, RuntimeDefault seccomp; the service account token is only mounted when coding sessions run on Kubernetes.
-- Startup, liveness and readiness probes; pods restart on config changes (checksums).
-- Several replicas work (jobs are coordinated in Postgres, migrations take a lock); a PodDisruptionBudget is added for `replicaCount > 1`.
-- Ingress only for what you enable; the Teams ingress exposes only `/api/messages`.
+- Non-root, read-only root filesystem, no capabilities, RuntimeDefault seccomp. The service account token is only mounted when coding sessions run on Kubernetes.
+- Startup, liveness and readiness probes. Pods restart on config changes (checksums).
+- Several replicas work (jobs are coordinated in Postgres, migrations take a lock). A PodDisruptionBudget is added for `replicaCount > 1`.
+- Ingress only for what you enable. The Teams ingress exposes only `/api/messages`.
 
 ### Postgres
 
-Use a managed Postgres (Azure Database for PostgreSQL, Amazon RDS, Cloud SQL) or an operator such as CloudNativePG. Heinzel needs one database and a user that may create tables. Back it up like any production database; it holds memories, settings, the audit log and (unless `EVENTS_RETENTION_DAYS` is set) message copies.
+Use a managed Postgres (Azure Database for PostgreSQL, Amazon RDS, Cloud SQL) or an operator such as CloudNativePG. Heinzel needs one database and a user that may create tables. Back it up like any production database. It holds memories, settings, the audit log and (unless `EVENTS_RETENTION_DAYS` is set) message copies.
 
 ## Docker Compose
 
-For a single machine: `docker compose --profile app up -d` (see README). Admin UI and Teams endpoint are published on localhost; put a TLS reverse proxy in front.
+For a single machine: `docker compose --profile app up -d` (see README). Admin UI and Teams endpoint are published on localhost. Put a TLS reverse proxy in front.
 
 ## Upgrades
 
 1. Read CHANGELOG.md for the target version.
 2. `helm upgrade heinzel oci://ghcr.io/v0lumehi/charts/heinzel --version <new> -n heinzel -f values.yaml` (or pull the new image with Compose).
-3. Migrations run when the first new pod starts; the others wait for them. Migrations are additive within a major version, so old pods keep working during a rolling update.
+3. Migrations run when the first new pod starts. The others wait for them. Migrations are additive within a major version, so old pods keep working during a rolling update.
 
 Back up the database before major version upgrades.
 

@@ -5,7 +5,7 @@ A web UI to look after Heinzel: channel settings, team memory, usage, coding ses
 | Page | What it does |
 |---|---|
 | Setup | Readiness checklist, connection status per chat platform (last message received), step-by-step guides for Slack and Teams, Slack manifest and Teams app package as downloads |
-| Channels | All channels with activity; per channel: ambient mode, daily limit for unprompted posts, instructions, its memories, coding sessions and change history |
+| Channels | All channels with activity. Per channel: ambient mode, daily limit for unprompted posts, instructions, its memories, coding sessions and change history |
 | Memories | Search across all scopes (channel, organization, person) and delete |
 | Usage | LLM calls and tokens per channel and per day/model (1, 7, 30, 90 days) |
 | Coding sessions | All sessions with status and merge request |
@@ -49,21 +49,21 @@ pnpm dev:web                  # optional: UI with hot reload on http://localhost
    ADMIN_OIDC_CLIENT_SECRET=<secret>
    ```
 
-The assigned app roles arrive in the ID token's `roles` claim. Other providers (Keycloak, Okta, Google Workspace, …) work the same way; set `ADMIN_ROLE_CLAIM` (e.g. `groups`) and `ADMIN_ADMIN_ROLES` / `ADMIN_VIEWER_ROLES` to the values your provider sends.
+The assigned app roles arrive in the ID token's `roles` claim. Other providers (Keycloak, Okta, Google Workspace, …) work the same way. Set `ADMIN_ROLE_CLAIM` (e.g. `groups`) and `ADMIN_ADMIN_ROLES` / `ADMIN_VIEWER_ROLES` to the values your provider sends.
 
 ## Settings and MCP servers: what lives where
 
 | | Where | Changed by |
 |---|---|---|
 | Database, ports, sign-in of the admin UI, secrets key, coding runner, chat platform credentials, LLM API key | Deployment (env / Helm values / Secret) | Operations |
-| Models, ambient defaults, limits, retention, allowed repositories | **Settings** page; the deployment value is the starting point | Admins |
+| Models, ambient defaults, limits, retention, allowed repositories | **Settings** page. The deployment value is the starting point | Admins |
 | MCP servers over HTTP | **Tools** page, or `mcp.json` | Admins / operations |
 | MCP servers that run a command (stdio) | `mcp.json` only | Operations |
 
 - A value changed in the UI overrides the deployment value until someone presses *Reset*. The page shows where each value comes from.
-- **Configuration as code:** list settings in `LOCKED_SETTINGS` (comma-separated, or `*` for all) and the UI shows them read-only; the deployment value always applies.
+- **Configuration as code:** list settings in `LOCKED_SETTINGS` (comma-separated, or `*` for all) and the UI shows them read-only. The deployment value always applies.
 - Servers in `mcp.json` win over UI servers with the same name and are read-only in the UI.
-- **Secrets:** header values of MCP servers (tokens) are encrypted with AES-256-GCM using `SECRETS_KEY` (`openssl rand -base64 32`, keep it in your secret store; without it the UI cannot store tokens). Values are never shown again or written to the audit log; leave a value empty when editing to keep it. Alternatively write `${VAR}` and provide the variable in the deployment.
+- **Secrets:** header values of MCP servers (tokens) are encrypted with AES-256-GCM using `SECRETS_KEY`. Generate it with `openssl rand -base64 32` and keep it in your secret store. Without it, the UI cannot store tokens. Values are never shown again or written to the audit log. Leave a value empty when editing to keep it. Alternatively write `${VAR}` and provide the variable in the deployment.
 - Changes are announced through Postgres (LISTEN/NOTIFY), so every replica applies them within moments (and re-reads every 30 seconds as a fallback). MCP servers reconnect when their configuration changes.
 - Every change is in the audit log.
 
@@ -73,17 +73,17 @@ The assigned app roles arrive in the ID token's `roles` claim. Other providers (
 - Sessions live in Postgres (`admin_sessions`, only a hash of the cookie value), expire after `ADMIN_SESSION_HOURS` and end on sign-out. Several replicas share them.
 - Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` when `ADMIN_PUBLIC_URL` is https.
 - Every write needs the admin role and the session's CSRF token (`X-CSRF-Token` header).
-- Strict Content Security Policy and the usual security headers (`@fastify/helmet`); rate limits on the sign-in routes.
+- Strict Content Security Policy and the usual security headers (`@fastify/helmet`). Rate limits on the sign-in routes.
 - By default the server listens on 127.0.0.1 only. In production put it behind a TLS reverse proxy and set `ADMIN_HOST=0.0.0.0` (the Docker Compose file does this and publishes the port on localhost).
 
 ## Development notes
 
 - Backend: Fastify in `src/admin/` (`server.ts` routes, `auth.ts` OIDC, `types.ts` API shapes shared with the UI).
-- Frontend: React + Vite + Mantine + TanStack Query in `web/` (pnpm workspace). `pnpm build` builds both; the server serves `web/dist`.
+- Frontend: React + Vite + Mantine + TanStack Query in `web/` (pnpm workspace). `pnpm build` builds both. The server serves `web/dist`.
 - SQL stays in `src/store` and `src/memory` like everywhere else.
 
 ## Next
 
-- OAuth sign-in for MCP servers that require it; per-channel tool allowlist.
+- OAuth sign-in for MCP servers that require it. Per-channel tool allowlist.
 - Who may use chat commands (channel owners / admin group).
 - Delete and export everything about one person (GDPR).

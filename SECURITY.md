@@ -8,7 +8,7 @@ Include what you found, how to reproduce it and which version you run.
 
 ## Supported versions
 
-Security fixes go into the latest minor release. Run the latest release; upgrades are designed to be drop-in
+Security fixes go into the latest minor release. Run the latest release. Upgrades are designed to be drop-in
 (migrations run automatically, breaking changes are announced in CHANGELOG.md).
 
 ## Verifying releases
@@ -34,9 +34,9 @@ cosign verify-blob heinzel-<version>.tgz --bundle heinzel-<version>.tgz.sigstore
 
 - Heinzel acts only under its own bot identity and never as a user. Bot messages cannot trigger commands (no bot loops).
 - Everything except the LLM can run in your infrastructure. Message copies, memories and usage stay in your Postgres.
-- Tool output (web pages, MCP results) is treated as untrusted data in the prompt; web fetch refuses private network addresses.
+- Tool output (web pages, MCP results) is treated as untrusted data in the prompt. Web fetch refuses private network addresses.
 - Coding agents run in throwaway containers with an egress allowlist and can only open draft merge requests.
 - Admin UI: OIDC with PKCE, server-side sessions, CSRF tokens, strict Content Security Policy, roles from your identity provider, audit log.
-- Containers run as non-root; the Helm chart sets a read-only root filesystem, drops all capabilities and uses the RuntimeDefault seccomp profile.
+- Containers run as non-root. The Helm chart sets a read-only root filesystem, drops all capabilities and uses the RuntimeDefault seccomp profile.
 
 See docs/ARCHITECTURE.md, docs/CODING.md and docs/ADMIN.md for details.

@@ -36,7 +36,7 @@ Slack thread ─► Heinzel agent: tool start_coding_task (only when addressed d
 - Tokens the agent uses are booked as purpose `coding` in the usage table (`!status` shows the 24h total).
 - The agent sees the task Heinzel wrote plus the thread as context. It follows `AGENTS.md`/`CONTRIBUTING`/`README` in the repository.
 
-Commands (in the session's thread; in DMs the newest session):
+Commands (they apply to the session in the current thread, or to the newest session in a DM):
 
 | | |
 |---|---|
@@ -50,7 +50,7 @@ Commands (in the session's thread; in DMs the newest session):
    ```bash
    docker build -t heinzel-coder:latest coder/
    ```
-2. **Git token.** In GitLab, create a *project access token* (or group access token for several projects) with role **Developer** and scope **write_repository**. The token can then push branches but not to protected branches; merge requests come from push options, so no API scope is needed.
+2. **Git token.** In GitLab, create a *project access token* (or group access token for several projects) with role **Developer** and scope **write_repository**. The token can then push branches but not to protected branches. Merge requests come from push options, so no API scope is needed.
 3. **Isolation.** Start the egress proxy, the Docker API proxy and the internal network:
    ```bash
    docker compose --profile coding up -d
@@ -69,7 +69,7 @@ Commands (in the session's thread; in DMs the newest session):
    # DOCKER_HOST=unix:///Users/me/.colima/default/docker.sock
    ```
    In compose (`--profile app`), Heinzel talks to Docker through `docker-proxy` (`DOCKER_HOST=tcp://docker-proxy:2375`), never the raw socket.
-5. Restart Heinzel. The log says `coding: true`; a missing image is reported at startup.
+5. Restart Heinzel. The log says `coding: true`. A missing image is reported at startup.
 
 Further settings (`.env.example`): `CODING_MODEL` (default: `LLM_MODEL_HEAVY`, else `LLM_MODEL_AGENT`), `CODING_LLM_BASE_URL`/`CODING_LLM_API_KEY` (a separate key makes cost and revocation easy), `CODING_TIMEOUT_MIN` (45), `CODING_MAX_RUNNING` (2), `CODING_MEMORY_MB` (4096), `CODING_CPUS` (2), `CODING_NO_PROXY` (e.g. a GitLab on the internal network).
 
@@ -83,7 +83,7 @@ config:
   CODING_REPOSITORIES: "team/*"
 coding:
   enabled: true
-  namespace: heinzel-coding          # create it first; Heinzel may create Jobs and Secrets there
+  namespace: heinzel-coding          # create it first. Heinzel may create Jobs and Secrets there
   runtimeClassName: gvisor           # optional, recommended (gVisor or Kata must be installed)
   egress:
     allow: [router.eu.requesty.ai, gitlab.example.com]
@@ -95,7 +95,7 @@ What the chart sets up:
 - Per session: a Job (one pod, no retries, deadline) and a Secret with its environment (git token, LLM key) owned by the Job, so both disappear together. The pod gets no service account token, a RuntimeDefault seccomp profile, no privilege escalation, `cap-drop ALL` plus the five capabilities needed to drop privileges, and CPU/memory limits.
 - The **egress proxy** (same image, `dist/egress/proxy.js`) with the allowlist, and a **NetworkPolicy** that allows coding pods only DNS and the proxy.
 
-NetworkPolicies only work if your cluster's network plugin enforces them (Calico, Cilium, Azure Network Policy Manager, …). Check it once after installing; this must print `BLOCKED`:
+NetworkPolicies only work if your cluster's network plugin enforces them (Calico, Cilium, Azure Network Policy Manager, …). Check it once after installing. This must print `BLOCKED`:
 
 ```bash
 kubectl -n heinzel-coding run nettest --rm -i --restart=Never --labels=heinzel.coding=true \
@@ -114,7 +114,7 @@ The coding agent runs arbitrary commands, and its input (the thread, issue texts
 | Stealing the git token | The token is only visible to root in the container. The agent runs as the unprivileged user `coder`, cannot read root's environment or the credentialed clone in `/srv`, and its commits leave `/workspace` only as a git bundle, so hooks or git config it writes never run with the token. |
 | Pushing to the wrong place | The push target is fixed by Heinzel (`heinzel/<id>-…` in the configured repository). The project access token cannot push to protected branches. The MR is a draft. |
 | Breaking out / hogging the host | `cap-drop ALL` (plus the five capabilities needed to drop privileges), `no-new-privileges`, memory, CPU and PID limits, timeout. Docker: Heinzel reaches Docker only through a filtering socket proxy. Kubernetes: a namespaced Role, no service account token in coding pods, optional gVisor/Kata RuntimeClass. |
-| The LLM key | The agent needs it to work. Use a separate key (`CODING_LLM_API_KEY`) with its own budget; it can only be used against the allowed gateway. |
+| The LLM key | The agent needs it to work. Use a separate key (`CODING_LLM_API_KEY`) with its own budget. It can only be used against the allowed gateway. |
 
 What remains: the agent can read everything in the repository and send it to your LLM gateway, and it can push arbitrary content to its own branch. Review the merge request like any other contribution.
 
@@ -122,7 +122,7 @@ What remains: the agent can read everything in the repository and send it to you
 
 - Runners: Docker (`src/coding/docker.ts`) and Kubernetes Jobs (`src/coding/kubernetes.ts`, `CODING_RUNNER=kubernetes`), both behind `CodingRunner` (`src/coding/runner.ts`). A session whose pod cannot be scheduled waits until `CODING_TIMEOUT_MIN`.
 - Backends: OpenCode only. GitLab Duo Agent Platform is planned as a second backend (`backend` column on `coding_sessions`): for customers with DAP, sessions would run on their GitLab runners.
-- One task per session; follow-up requests in the same thread start a new session (continuing a session is planned).
+- One task per session. Follow-up requests in the same thread start a new session (continuing a session is planned).
 - Push options create merge requests on GitLab only. On other hosts the branch is pushed and the final message says so.
 - Empty repositories work: Heinzel first pushes an empty "Initialize repository" commit to the default branch (GitLab allows developers this first push), so the merge request has a target.
 - A new session starts from the default branch. To build on an unmerged session, merge its MR first or ask for the session's branch as the base (the tool has a `base_branch` argument).

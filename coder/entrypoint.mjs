@@ -86,7 +86,6 @@ try {
     const author = ["-c", `user.name=${env.HEINZEL_GIT_AUTHOR_NAME || "Heinzel"}`, "-c", `user.email=${env.HEINZEL_GIT_AUTHOR_EMAIL || "heinzel@localhost"}`];
     must("git", ["-C", ORIGIN, ...author, "commit", "--quiet", "--allow-empty", "-m", "Initialize repository"]);
     must("git", ["-C", ORIGIN, "-c", authHeader, "push", "--quiet", "origin", `HEAD:refs/heads/${baseBranch}`]);
-    must("git", ["-C", ORIGIN, "fetch", "--quiet", "origin"]);
   }
 
   // 2. The agent's checkout: a local clone without credentials, owned by the agent user.

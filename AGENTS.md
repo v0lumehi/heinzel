@@ -47,5 +47,7 @@ git config user.email "aljic.zijad@gmail.com"
 
 Append a short entry when you stop, so the next person or agent can continue.
 
+- **2026-10-17** — `.env` is now loaded at startup (`loadDotEnv()` via `process.loadEnvFile`, existing env vars win); before, `pnpm dev`/`start`/`migrate` ignored it.
+
 - **2026-10-17** — Apache-2.0 license (personal project). Configurable event retention (`EVENTS_RETENTION_DAYS`, default keep); policy still open.
 - **2026-10-17** — Initial build. Slack MVP, ambient triage, follow-ups, memory, heavy-model escalation, tests, docs. Next: live test (ROADMAP §1), then Teams adapter (ROADMAP §2).

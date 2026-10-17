@@ -73,6 +73,18 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema>;
 
+/**
+ * Loads `.env` from the working directory into process.env, if the file exists.
+ * Variables already set in the environment win (Docker, CI, shell exports).
+ */
+export function loadDotEnv(path = ".env"): void {
+  try {
+    process.loadEnvFile(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {

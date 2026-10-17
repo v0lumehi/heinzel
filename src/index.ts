@@ -1,5 +1,5 @@
 import pino from "pino";
-import { loadConfig } from "./config.js";
+import { loadConfig, loadDotEnv } from "./config.js";
 import { SlackAdapter } from "./adapters/slack/adapter.js";
 import { Engine } from "./core/engine.js";
 import type { ChatAdapter, Platform } from "./core/types.js";
@@ -11,6 +11,7 @@ import { JobQueue } from "./queue/queue.js";
 import { Worker } from "./queue/worker.js";
 import { Store } from "./store/store.js";
 
+loadDotEnv();
 const config = loadConfig();
 const log = pino({
   level: config.LOG_LEVEL,

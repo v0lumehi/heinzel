@@ -43,6 +43,8 @@ export async function migrate(db: Db, log: (msg: string) => void = () => {}): Pr
 // CLI: `pnpm migrate`
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const { createPool } = await import("./pool.js");
+  const { loadDotEnv } = await import("../config.js");
+  loadDotEnv();
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
   const db = createPool(url);

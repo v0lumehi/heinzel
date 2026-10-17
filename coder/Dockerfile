@@ -1,6 +1,6 @@
 # Heinzel coding container: git + OpenCode, one task per container.
 # Extend it with your project's toolchain (FROM heinzel-coder, then install JDK, Python, …) so the agent can run tests.
-FROM node:22-slim
+FROM node:25-slim
 ARG OPENCODE_VERSION=2.0.32
 
 RUN apt-get update \

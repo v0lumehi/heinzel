@@ -1,9 +1,13 @@
 # Changelog
 
-All notable changes. Versions follow [Semantic Versioning](https://semver.org); upgrade notes say when you need to act.
+All notable changes. Versions follow [Semantic Versioning](https://semver.org), and upgrade notes say when you need to act.
 Database migrations run automatically at startup.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-10-17
+
+First release: a self-hosted AI teammate for Slack and Microsoft Teams with an admin UI, Helm chart and signed images.
 
 ### Added
 - Slack adapter (Socket Mode) and Microsoft Teams adapter (Teams SDK v2), `pnpm teams:package` for the Teams app package.
@@ -27,3 +31,6 @@ Database migrations run automatically at startup.
 - The Heinzel image contains no npm, npx or corepack; stdio MCP servers are baked into a derived image (docs/TOOLS.md).
 - Base images pinned by digest; workflow checkouts without persisted credentials; `main` protected against deletion and force pushes.
 - Admin UI: MCP server and header names are validated and stored without prototype (found by CodeQL); Teams text conversion removes nested tag fragments.
+
+[Unreleased]: https://github.com/v0lumehi/heinzel/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/v0lumehi/heinzel/releases/tag/v0.1.0

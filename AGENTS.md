@@ -20,6 +20,7 @@ TEST_DATABASE_URL=postgres://… pnpm test     # full suite; the database is DRO
 pnpm dev                                     # needs .env (see .env.example)
 pnpm build && pnpm start
 pnpm mcp                                     # list tools of the MCP servers in MCP_CONFIG
+pnpm teams:package                           # Teams app package (heinzel-teams.zip) for TEAMS_APP_ID
 ```
 
 No Docker? Any local Postgres 14+ works. Create an empty database for tests.

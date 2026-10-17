@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
     "mcp": "tsx src/mcp/cli.ts",
+    "teams:package": "tsx src/adapters/teams/package-cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

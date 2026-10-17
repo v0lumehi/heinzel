@@ -259,7 +259,7 @@ export class RuntimeConfig {
     }
     const raw = { url: input.url, headers: { ...headers }, ...(input.tools ? { tools: input.tools } : {}), exclude: input.exclude, timeoutMs: input.timeoutMs };
     try {
-      parseMcpConfig({ mcpServers: { [input.name]: raw } }, this.d.env);
+      parseMcpConfig({ mcpServers: Object.fromEntries([[input.name, raw]]) }, this.d.env);
     } catch (err) {
       throw new SettingsError(err instanceof Error ? err.message.replace(/^Invalid MCP config:\n\s*-\s*/, "") : String(err));
     }
@@ -303,7 +303,7 @@ export class RuntimeConfig {
   /** Connects once with the given settings and lists the tools, without saving anything. */
   async testMcpServer(input: McpServerInput): Promise<McpServerReport> {
     const { raw } = await this.prepare(input);
-    const servers = parseMcpConfig({ mcpServers: { [input.name]: { ...raw, enabled: true } } }, this.d.env);
+    const servers = parseMcpConfig({ mcpServers: Object.fromEntries([[input.name, { ...raw, enabled: true }]]) }, this.d.env);
     const hub = this.d.testHub?.() ?? new McpHub({ log: this.d.log, maxResultChars: this.d.config.TOOL_RESULT_MAX_CHARS });
     try {
       await hub.start(servers);

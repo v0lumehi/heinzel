@@ -27,7 +27,7 @@ Heinzel is a single Node.js process (TypeScript, ESM) plus Postgres. It can be s
 | `src/core/engine.ts` | The brain: ingest, routing, job handlers, posting, budgets |
 | `src/core/commands.ts` | `!`-prefixed admin commands (no LLM involved) |
 | `src/adapters/slack/` | Bolt + Socket Mode; Slack wire format ⇄ plain text / mrkdwn |
-| `src/adapters/teams/` | Planned (see ROADMAP) |
+| `src/adapters/teams/` | Teams SDK v2 behind an HTTP endpoint (`/api/messages`); activities ⇄ plain text / markdown (docs/TEAMS.md) |
 | `src/agent/` | System prompt, transcript rendering, tool loop, tools (memory, follow-ups, escalate, web fetch) |
 | `src/mcp/` | MCP client: config file, connections (stdio / streamable HTTP), MCP tools as agent tools, `pnpm mcp` |
 | `src/coding/` | Coding sessions: coordinator (confirm, start, watch, finish), Docker runner, OpenCode event parser, `start_coding_task` tool |

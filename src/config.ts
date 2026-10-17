@@ -44,10 +44,17 @@ const schema = z.object({
   SLACK_BOT_TOKEN: optionalString,
   SLACK_APP_TOKEN: optionalString,
 
-  // --- Microsoft Teams (phase 3; not implemented yet) ---
+  // --- Microsoft Teams (enabled when TEAMS_APP_ID is set, or TEAMS_PLAYGROUND=true) ---
+  /** Azure Bot registration: Microsoft App ID, client secret and the tenant the app is registered in. */
   TEAMS_APP_ID: optionalString,
   TEAMS_APP_PASSWORD: optionalString,
   TEAMS_TENANT_ID: optionalString,
+  /** Port of the messaging endpoint (`/api/messages`). Teams needs it reachable over public HTTPS (reverse proxy or dev tunnel). */
+  TEAMS_PORT: z.coerce.number().int().min(1).max(65535).default(3978),
+  /** Local testing with the Microsoft 365 Agents Playground: no credentials, unauthenticated requests, localhost only. */
+  TEAMS_PLAYGROUND: bool.default(false),
+  /** Bot Connector URL for proactive posts to conversations not seen since the start. Default: https://smba.trafficmanager.net/teams */
+  TEAMS_SERVICE_URL: optionalString,
 
   // --- External tools ---
   /** Path to a JSON file with MCP servers (`mcpServers` format, see mcp.example.json). Unset = no MCP tools. */
@@ -126,6 +133,11 @@ export function loadDotEnv(path = ".env"): void {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema
     .superRefine((c, ctx) => {
+      if (c.TEAMS_APP_ID) {
+        for (const key of ["TEAMS_APP_PASSWORD", "TEAMS_TENANT_ID"] as const) {
+          if (!c[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when TEAMS_APP_ID is set" });
+        }
+      }
       if (!c.CODING_ENABLED) return;
       for (const key of ["GITLAB_URL", "CODING_GIT_TOKEN"] as const) {
         if (!c[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when CODING_ENABLED=true" });

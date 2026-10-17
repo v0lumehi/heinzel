@@ -96,7 +96,7 @@ describe.skipIf(!TEST_DATABASE_URL)("engine", () => {
     await engine.handleIncoming(msg({ text: "@Heinzel !instructions Always answer in German.", mentionsBot: true }));
     expect((await store.getChannel("slack:C1"))?.instructions).toBe("Always answer in German.");
     await engine.handleIncoming(msg({ text: "@Heinzel !status", mentionsBot: true }));
-    expect(adapter.sent.map((s) => s.text).join("\n")).toMatch(/Ambient mode is \*on\*[\s\S]*Ambient mode: on/);
+    expect(adapter.sent.map((s) => s.text).join("\n")).toMatch(/Ambient mode is \*\*on\*\*[\s\S]*Ambient mode: on/);
     expect(llm.requests).toHaveLength(0);
     expect(await drain(queue, engine.handlers())).toBe(0);
   });
@@ -171,6 +171,22 @@ describe.skipIf(!TEST_DATABASE_URL)("engine", () => {
     expect(adapter.sent[1]!.threadId).toBe(root.messageId);
     const { rows } = await db.query("SELECT kind FROM bot_posts ORDER BY id");
     expect(rows.map((r) => r.kind)).toEqual(["reply", "reply"]); // in-thread replies don't eat the ambient budget
+  });
+
+  it("builds context from stored history when the adapter cannot fetch it (Teams)", async () => {
+    Object.assign(adapter, { fetchThread: undefined, fetchRecent: undefined });
+    const root = msg({ text: "@Heinzel which region do we deploy to?", mentionsBot: true });
+    await engine.handleIncoming(root);
+    await drain(queue, engine.handlers());
+
+    agentAnswer = () => reply("Same as before.");
+    await engine.handleIncoming(msg({ text: "@Heinzel and staging?", mentionsBot: true, threadId: root.messageId }));
+    await drain(queue, engine.handlers());
+
+    const transcript = JSON.stringify(llm.byModel("agent-model").at(-1)!.messages);
+    expect(transcript).toContain("which region do we deploy to?");
+    expect(transcript).toContain("Here is the answer.");
+    expect(transcript).toContain("and staging?");
   });
 
   it("schedules a follow-up via tool and posts it when due", async () => {

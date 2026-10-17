@@ -80,7 +80,7 @@ export function parseCommand(text: string): Command | null {
 
 export function helpText(botName: string): string {
   return [
-    `*${botName} commands* (mention me, then the command):`,
+    `**${botName} commands** (mention me, then the command):`,
     "`!status` – settings and usage for this channel",
     "`!ambient on|off` – let me speak up without being tagged",
     "`!limit <n>|default` – max unprompted posts per day here",

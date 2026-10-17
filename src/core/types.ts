@@ -49,10 +49,10 @@ export interface ChatAdapter {
   start(onEvent: EventHandler): Promise<void>;
   stop(): Promise<void>;
   send(message: OutboundMessage): Promise<SentMessage>;
-  /** Messages of a thread, oldest first, including the root. */
-  fetchThread(channelId: string, threadId: string, limit: number): Promise<ChatEvent[]>;
-  /** Most recent top-level messages of a channel, oldest first. */
-  fetchRecent(channelId: string, limit: number): Promise<ChatEvent[]>;
+  /** Messages of a thread, oldest first, including the root. Optional: without it the engine uses its stored copy. */
+  fetchThread?(channelId: string, threadId: string, limit: number): Promise<ChatEvent[]>;
+  /** Most recent top-level messages of a channel, oldest first. Optional like fetchThread. */
+  fetchRecent?(channelId: string, limit: number): Promise<ChatEvent[]>;
   /** Optional lightweight acknowledgement (e.g. 👀 reaction) while working. */
   acknowledge?(channelId: string, messageId: string): Promise<void>;
   /** Optional: replace the text of a message Heinzel sent (live status updates). */

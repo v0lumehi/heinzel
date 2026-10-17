@@ -180,7 +180,7 @@ describe("coding helpers", () => {
 
   it("formats the live status and the final message", () => {
     const status = formatStatus(session(), new Date("2026-10-17T10:07:00Z"));
-    expect(status).toContain("*Coding session #7* · team/api · running · 7 min");
+    expect(status).toContain("**Coding session #7** · team/api · running · 7 min");
     expect(status).toContain("• `edit src/login.ts`");
     expect(status).toContain("tokens in/out: 12k/800");
     expect(status).toContain("`!stop 7`");

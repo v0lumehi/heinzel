@@ -246,6 +246,6 @@ describe.skipIf(!TEST_DATABASE_URL)("engine: coding sessions", () => {
     await engine.coding!.maintain();
     expect((await sessions.get(1))!.status).toBe("expired");
     expect(await command("@Heinzel !go", thread)).toBe("There is no coding session waiting for confirmation in this thread.");
-    expect(await command("@Heinzel !coding", thread)).toBe("*Coding sessions*\n#1 ⌛ expired · team/api · Fix login redirect");
+    expect(await command("@Heinzel !coding", thread)).toBe("**Coding sessions**\n#1 ⌛ expired · team/api · Fix login redirect");
   });
 });

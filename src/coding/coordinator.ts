@@ -135,7 +135,7 @@ export class CodingCoordinator {
   async list(channelKey: string): Promise<string> {
     const sessions = await this.d.sessions.recentInChannel(channelKey, 8);
     if (sessions.length === 0) return "No coding sessions in this channel yet.";
-    return ["*Coding sessions*", ...sessions.map((s) => `#${s.id} ${statusIcon(s.status)} ${s.status} · ${s.repository} · ${s.title}${s.result?.mergeRequestUrl ? ` · ${s.result.mergeRequestUrl}` : ""}`)].join("\n");
+    return ["**Coding sessions**", ...sessions.map((s) => `#${s.id} ${statusIcon(s.status)} ${s.status} · ${s.repository} · ${s.title}${s.result?.mergeRequestUrl ? ` · ${s.result.mergeRequestUrl}` : ""}`)].join("\n");
   }
 
   /**
@@ -365,7 +365,7 @@ export function formatStatus(s: CodingSession, now: Date): string {
   const p = s.progress;
   const end = s.finishedAt ?? now;
   const lines = [
-    `${statusIcon(s.status)} *Coding session #${s.id}* · ${s.repository} · ${s.status.replace("_", " ")} · ${minutes(s.startedAt, end)}`,
+    `${statusIcon(s.status)} **Coding session #${s.id}** · ${s.repository} · ${s.status.replace("_", " ")} · ${minutes(s.startedAt, end)}`,
     `_${s.title}_`,
   ];
   if (p.recent?.length) lines.push(...p.recent.map((r) => `• \`${r.replace(/`/g, "'")}\``));

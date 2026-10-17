@@ -3,6 +3,8 @@
 ## Done (MVP)
 
 - Slack adapter (Socket Mode): mentions, DMs, threads, 👀 acknowledgement, Slack ⇄ markdown conversion
+- Live test with a real Slack workspace and Requesty, including coding sessions
+- Microsoft Teams adapter (Teams SDK v2, HTTP endpoint), verified with the Microsoft 365 Agents Playground (docs/TEAMS.md)
 - Engine with durable Postgres job queue (retries, backoff, stale-job recovery, dedupe keys)
 - Agent tool loop on any OpenAI-compatible gateway, Requesty metadata for cost attribution
 - Ambient mode per channel: rule pre-filter → triage model → budgeted reply
@@ -17,20 +19,17 @@
 
 ## Next
 
-### 1. Live test with a real Slack workspace and Requesty
+### 1. Tuning on real conversations
 - Tune triage prompt and `AMBIENT_MIN_CONFIDENCE` on real conversations.
 - Check how the chosen models handle the `SILENT` convention and tool calls through Requesty.
 
-### 2. Microsoft Teams adapter (`src/adapters/teams/`)
-Implement `ChatAdapter` with the Microsoft Teams SDK for TypeScript (`@microsoft/teams.apps`) or Bot Framework.
-- Azure Bot registration → `TEAMS_APP_ID`, `TEAMS_APP_PASSWORD`, `TEAMS_TENANT_ID`.
-- Needs a publicly reachable HTTPS messaging endpoint (unlike Slack Socket Mode). For local dev: dev tunnel.
-- Reading channel messages without an @-mention requires the RSC permission `ChannelMessage.Read.Group` in the app manifest (`ChatMessage.Read.Chat` for group chats).
-- Threads: a Teams channel "conversation" = thread root; replies carry the root id in the conversation id (`…;messageid=<root>`). Map to `threadId`.
-- Proactive posts (ambient, follow-ups) need a stored conversation reference per channel → add a `platform_refs` JSONB column on `channels`.
-- Teams does not echo the bot's own messages; the engine already records its own posts, so nothing else changes.
-- `fetchThread` / `fetchRecent` need Microsoft Graph (`ChannelMessage.Read.Group` via RSC or app permissions). Fallback: the engine already uses stored history when the adapter throws.
-- Markdown: Teams renders a markdown subset; convert lists/links as needed in the adapter.
+### 2. Microsoft Teams in a real tenant
+The adapter exists (docs/TEAMS.md); what is left needs a tenant:
+- Azure Bot registration, dev tunnel, app manifest with RSC permissions `ChannelMessage.Read.Group` / `ChatMessage.Read.Chat`.
+- Verify auth, channel threads, ambient mode, 👀 reactions, markdown rendering, proactive posts after a restart.
+- `fetchThread` / `fetchRecent` through Microsoft Graph (today the engine uses its stored history).
+- Real @-mentions in replies (`<at>` + mention entity).
+- If the global service URL fallback is not reliable: store it per channel (`platform_refs` on `channels`).
 
 ### 3. Coding sessions, next
 - Live test against a real GitLab (push options → draft MR; protected branches).
@@ -62,6 +61,7 @@ Implement `ChatAdapter` with the Microsoft Teams SDK for TypeScript (`@microsoft
 - Memory search is keyword-based (Postgres full-text, `simple` config): synonyms are not matched.
 - No streaming: answers are posted once complete.
 - Slack name/channel lookups are cached in memory per process and never refreshed.
+- Teams: no history from before Heinzel joined (no Graph yet); `@Name` in replies does not notify the person.
 - Edits and deletions of messages are ignored (the stored copy keeps the original text).
 - File contents and images are not read (also PDFs via web fetch).
 - All tool schemas go with every agent call; large MCP servers cost thousands of tokens per call unless `tools` is narrowed.

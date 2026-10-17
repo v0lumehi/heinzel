@@ -4,6 +4,7 @@ import { createWebFetchTool } from "./agent/webfetch.js";
 import { DockerRunner } from "./coding/docker.js";
 import { loadConfig, loadDotEnv } from "./config.js";
 import { SlackAdapter } from "./adapters/slack/adapter.js";
+import { TeamsAdapter } from "./adapters/teams/adapter.js";
 import { Engine } from "./core/engine.js";
 import type { ChatAdapter, Platform } from "./core/types.js";
 import { migrate } from "./db/migrate.js";
@@ -46,11 +47,22 @@ if (config.SLACK_BOT_TOKEN && config.SLACK_APP_TOKEN) {
     new SlackAdapter({ botToken: config.SLACK_BOT_TOKEN, appToken: config.SLACK_APP_TOKEN, botName: config.BOT_NAME, log: log.child({ adapter: "slack" }) }),
   );
 }
-if (config.TEAMS_APP_ID) {
-  log.warn("TEAMS_* is set, but the Microsoft Teams adapter is not implemented yet (see docs/ROADMAP.md)");
+if (config.TEAMS_APP_ID || config.TEAMS_PLAYGROUND) {
+  adapters.set(
+    "teams",
+    new TeamsAdapter({
+      appId: config.TEAMS_APP_ID,
+      appPassword: config.TEAMS_APP_PASSWORD,
+      tenantId: config.TEAMS_TENANT_ID,
+      port: config.TEAMS_PORT,
+      playground: config.TEAMS_PLAYGROUND,
+      serviceUrl: config.TEAMS_SERVICE_URL,
+      log: log.child({ adapter: "teams" }),
+    }),
+  );
 }
 if (adapters.size === 0) {
-  log.fatal("No chat platform configured. Set SLACK_BOT_TOKEN and SLACK_APP_TOKEN (see README).");
+  log.fatal("No chat platform configured. Set SLACK_BOT_TOKEN and SLACK_APP_TOKEN, or TEAMS_APP_ID (see README).");
   process.exit(1);
 }
 

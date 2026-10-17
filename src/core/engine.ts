@@ -272,7 +272,7 @@ export class Engine {
         const posted = await store.unsolicitedPostsLast24h(channel.channelKey);
         const limit = channel.dailyUnsolicitedLimit ?? config.AMBIENT_DAILY_LIMIT;
         reply = [
-          `*Status for ${channel.name ? `#${channel.name}` : channel.channelKey}*`,
+          `**Status for ${channel.name ? `#${channel.name}` : channel.channelKey}**`,
           `Ambient mode: ${channel.ambientEnabled ? "on" : "off"}`,
           `Unprompted posts (24h): ${posted}/${limit}`,
           `LLM calls (24h): ${usage.calls} · tokens in/out: ${usage.promptTokens}/${usage.completionTokens}`,
@@ -287,8 +287,8 @@ export class Engine {
       case "ambient":
         await store.updateChannel(channel.channelKey, { ambientEnabled: cmd.enabled });
         reply = cmd.enabled
-          ? "Ambient mode is *on*. I'll follow this channel and speak up when I can clearly help."
-          : "Ambient mode is *off*. I'll only respond when tagged (and in threads I'm part of).";
+          ? "Ambient mode is **on**. I'll follow this channel and speak up when I can clearly help."
+          : "Ambient mode is **off**. I'll only respond when tagged (and in threads I'm part of).";
         break;
       case "limit":
         await store.updateChannel(channel.channelKey, { dailyUnsolicitedLimit: cmd.perDay });
@@ -297,7 +297,7 @@ export class Engine {
           : `Daily limit for unprompted posts set to ${cmd.perDay}.`;
         break;
       case "instructions-show":
-        reply = channel.instructions ? `*Instructions for this channel:*\n${channel.instructions}` : "No instructions set. Use `!instructions <text>`.";
+        reply = channel.instructions ? `**Instructions for this channel:**\n${channel.instructions}` : "No instructions set. Use `!instructions <text>`.";
         break;
       case "instructions-set":
         await store.updateChannel(channel.channelKey, { instructions: cmd.text.slice(0, 4000) });
@@ -359,19 +359,19 @@ export class Engine {
     });
   }
 
-  /** Thread (or recent channel / DM history for top-level messages), from the platform with our store as fallback. */
+  /** Thread (or recent channel / DM history for top-level messages), from the platform if it can, else from our store. */
   private async conversationContext(ev: StoredEvent): Promise<ChatEvent[]> {
     const { config, store, log } = this.d;
     const limit = config.CONTEXT_MESSAGES;
     const inThread = ev.threadId !== ev.messageId;
-    let events: ChatEvent[];
+    const adapter = this.adapter(ev.platform);
+    let events: ChatEvent[] | undefined;
     try {
-      const adapter = this.adapter(ev.platform);
-      events = inThread ? await adapter.fetchThread(ev.channelId, ev.threadId, limit) : await adapter.fetchRecent(ev.channelId, Math.min(limit, 15));
+      events = inThread ? await adapter.fetchThread?.(ev.channelId, ev.threadId, limit) : await adapter.fetchRecent?.(ev.channelId, Math.min(limit, 15));
     } catch (err) {
       log.warn({ err, channel: ev.channelKey }, "fetching context from platform failed; using stored history");
-      events = inThread ? await store.threadEvents(ev.channelKey, ev.threadId, limit) : await store.recentChannelEvents(ev.channelKey, ev.id + 1, 15);
     }
+    events ??= inThread ? await store.threadEvents(ev.channelKey, ev.threadId, limit) : await store.recentChannelEvents(ev.channelKey, ev.id + 1, 15);
     if (!events.some((x) => x.messageId === ev.messageId)) events.push(ev);
     return events;
   }

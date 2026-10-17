@@ -4,9 +4,8 @@ Start here when you pick up work on Heinzel. Read `docs/ARCHITECTURE.md` for the
 
 ## Current state
 
-- MVP complete for Slack; 86 tests green (unit + Postgres integration).
-- Not yet run against a live Slack workspace or Requesty — that is the next step (ROADMAP §1).
-- Teams adapter not started (ROADMAP §2, detailed plan there).
+- MVP complete for Slack, live-tested with a real workspace and Requesty (incl. coding sessions); 95 tests green (unit + Postgres integration).
+- Teams adapter (docs/TEAMS.md) works in the Microsoft 365 Agents Playground (`TEAMS_PLAYGROUND=true`); not yet in a real tenant (ROADMAP §2).
 - External tools: MCP client + built-in web fetch (docs/TOOLS.md). Self-hosted SearXNG verified; GitLab's official MCP server and Atlassian Rovo not tested yet.
 - Coding sessions (docs/CODING.md): verified end to end with a real LLM, the Docker runner, OpenCode 2.0.32, the egress proxy and a local git daemon (branch pushed). Not yet against a real GitLab (push options → MR).
 - Docker images build: `docker build -t heinzel .` and `docker build -t heinzel-coder coder/`.
@@ -28,7 +27,7 @@ No Docker? Any local Postgres 14+ works. Create an empty database for tests.
 ## Conventions
 
 - TypeScript strict, ESM (`"type": "module"`), NodeNext resolution → relative imports end in `.js`.
-- Versions in use: TypeScript 7, zod 4, openai SDK 7 (chat completions API), @slack/bolt 5 (default import: `import bolt from "@slack/bolt"`), vitest 5, pino 10.
+- Versions in use: TypeScript 7, zod 4, openai SDK 7 (chat completions API), @slack/bolt 5 (default import: `import bolt from "@slack/bolt"`), Teams SDK 2.1 (`@microsoft/teams.apps`), vitest 5, pino 10.
 - Code, comments and docs in English. User-facing chat replies follow the language of the conversation.
 - All SQL lives in `src/store`, `src/memory`, `src/queue` and migrations. Schema changes = new numbered file in `src/db/migrations/` (never edit an applied one).
 - Adapters translate only; business logic belongs in `src/core/engine.ts`.
@@ -51,6 +50,7 @@ git config user.email "aljic.zijad@gmail.com"
 
 Append a short entry when you stop, so the next person or agent can continue.
 
+- **2026-10-17** — Slack live test done (incl. coding). Teams adapter on the Teams SDK v2: HTTP endpoint, playground mode, 👀 via reactions API, markdown out; `fetchThread`/`fetchRecent` are now optional (engine falls back to stored history). Verified end to end with the headless Agents Playground and a real LLM. Engine/command texts now use `**bold**` (Slack converts). Next: real tenant (Azure Bot, dev tunnel, manifest with RSC), then Graph history (docs/TEAMS.md, ROADMAP §2).
 - **2026-10-17** — Coding sessions (OpenCode 2 in Docker, egress proxy, `!go`/`!stop`/`!coding`), self-hosted SearXNG search (`--profile tools`), GitLab's official MCP server in the example; Exa removed. Next: test against a real GitLab, then DAP backend and Kubernetes runner (ROADMAP §3).
 - **2026-10-17** — External tools: MCP client (`src/mcp/`, `mcp.example.json`, `pnpm mcp`, docs/TOOLS.md) and built-in `web__fetch_url` with SSRF protection. Next: per-channel tool allowlist, OAuth login for MCP servers (ROADMAP §3).
 - **2026-10-17** — `.env` is now loaded at startup (`loadDotEnv()` via `process.loadEnvFile`, existing env vars win); before, `pnpm dev`/`start`/`migrate` ignored it.

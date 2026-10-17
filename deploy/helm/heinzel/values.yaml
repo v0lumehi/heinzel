@@ -1,0 +1,90 @@
+# Heinzel Helm chart. All settings of the app are environment variables (see .env.example in the repository):
+# non-secret ones go to `config`, secret ones to a Kubernetes Secret (`secrets`).
+
+image:
+  repository: ghcr.io/v0lumehi/heinzel
+  # Defaults to the chart's appVersion. Prefer a digest in production.
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# More than one replica is supported: jobs are coordinated through Postgres, sessions of the admin UI live there too.
+replicaCount: 1
+
+# Non-secret environment variables, e.g. LLM_MODEL_AGENT, AMBIENT_DAILY_LIMIT, ADMIN_PUBLIC_URL, ADMIN_OIDC_ISSUER.
+config:
+  LLM_BASE_URL: https://router.eu.requesty.ai/v1
+  LLM_MODEL_AGENT: ""
+  LLM_MODEL_TRIAGE: ""
+  LOG_LEVEL: info
+
+secrets:
+  # Name of an existing Secret with the secret variables (recommended; e.g. from External Secrets or Sealed Secrets).
+  # Needs at least DATABASE_URL and LLM_API_KEY; plus SLACK_BOT_TOKEN/SLACK_APP_TOKEN or TEAMS_APP_PASSWORD,
+  # ADMIN_OIDC_CLIENT_SECRET, CODING_GIT_TOKEN, ... as you use them.
+  existingSecret: ""
+  # Or let the chart create one from these values (convenient for tests; keeps secrets in your values file).
+  values: {}
+
+# MCP servers (the content of mcp.json, see docs/TOOLS.md). Empty = no external tools.
+# Use ${VAR} placeholders for tokens and put the variables into the Secret.
+mcp: {}
+
+service:
+  type: ClusterIP
+  annotations: {}
+
+# Admin UI: set ADMIN_PUBLIC_URL, ADMIN_OIDC_ISSUER and ADMIN_OIDC_CLIENT_ID in `config` and ADMIN_OIDC_CLIENT_SECRET
+# in the Secret (docs/ADMIN.md). Teams: Microsoft posts to https://<teams host>/api/messages (docs/TEAMS.md).
+ingress:
+  className: ""
+  annotations: {}
+  admin:
+    enabled: false
+    host: heinzel-admin.example.com
+    tlsSecretName: ""
+  teams:
+    enabled: false
+    host: heinzel-teams.example.com
+    tlsSecretName: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+podDisruptionBudget:
+  # Applies when replicaCount > 1.
+  minAvailable: 1
+
+networkPolicy:
+  # Restrict incoming traffic to the ingress controller (and Prometheus, if you add it). Outgoing traffic stays open:
+  # Heinzel calls the LLM gateway, Slack/Teams and your MCP servers.
+  enabled: false
+  ingressControllerNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: ingress-nginx
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Coding sessions on Kubernetes (see docs/CODING.md). Requires CODING_ENABLED=true and CODING_RUNNER=kubernetes in `config`.
+coding:
+  enabled: false
+  # Namespace for the coding Jobs; empty = the release namespace. A separate namespace is recommended.
+  namespace: ""
+  # RuntimeClass for stronger isolation, e.g. gvisor or kata (must exist in the cluster).
+  runtimeClassName: ""
+  image: ghcr.io/v0lumehi/heinzel-coder

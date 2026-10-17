@@ -1,0 +1,17 @@
+# Weekly dependency updates, grouped so they arrive as few PRs. New versions still need review (see AGENTS.md).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/", "/web"]
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }
+  - package-ecosystem: docker
+    directories: ["/", "/coder"]
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }

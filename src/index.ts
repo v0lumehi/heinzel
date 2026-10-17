@@ -10,6 +10,7 @@ import { TeamsAdapter } from "./adapters/teams/adapter.js";
 import { Engine } from "./core/engine.js";
 import type { ChatAdapter, Platform } from "./core/types.js";
 import { migrate } from "./db/migrate.js";
+import { HealthServer } from "./health.js";
 import { createPool } from "./db/pool.js";
 import { OpenAiCompatibleClient } from "./llm/client.js";
 import { loadMcpConfig } from "./mcp/config.js";
@@ -31,6 +32,10 @@ const log = pino({
 
 const db = createPool(config.DATABASE_URL);
 await migrate(db, (m) => log.info(m));
+
+// Up early so liveness probes pass while connecting; ready only once everything runs.
+const health = new HealthServer(db);
+if (config.HEALTH_PORT) await health.listen(config.HEALTH_PORT, config.HEALTH_HOST);
 
 const store = new Store(db);
 const memory = new MemoryStore(db);
@@ -134,6 +139,7 @@ if (config.ADMIN_OIDC_ISSUER || config.ADMIN_DEV_LOGIN) {
   }
 }
 
+health.setReady(true);
 log.info({ platforms: [...adapters.keys()], mcpServers: mcp.servers, coding: !!engine.coding, agentModel: config.LLM_MODEL_AGENT, triageModel: config.LLM_MODEL_TRIAGE }, `${config.BOT_NAME} is running`);
 
 async function housekeeping(): Promise<void> {
@@ -158,12 +164,14 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   log.info({ signal }, "shutting down");
+  health.setReady(false);
   const force = setTimeout(() => process.exit(1), 15_000);
   force.unref();
   for (const a of adapters.values()) await a.stop().catch((err) => log.warn({ err }, "adapter stop failed"));
   await admin?.close().catch((err) => log.warn({ err }, "admin UI stop failed"));
   await worker.stop();
   await mcp.stop();
+  await health.close().catch(() => {});
   await db.end();
   process.exit(0);
 }

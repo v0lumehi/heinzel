@@ -1,0 +1,36 @@
+{{- range $kind, $port := dict "admin" "admin" "teams" "teams" }}
+{{- $ing := index $.Values.ingress $kind }}
+{{- if $ing.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "heinzel.fullname" $ }}-{{ $kind }}
+  labels:
+    {{- include "heinzel.labels" $ | nindent 4 }}
+  {{- with $.Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $.Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if $ing.tlsSecretName }}
+  tls:
+    - hosts: [{{ $ing.host | quote }}]
+      secretName: {{ $ing.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ $ing.host | quote }}
+      http:
+        paths:
+          - path: {{ if eq $kind "teams" }}/api/messages{{ else }}/{{ end }}
+            pathType: {{ if eq $kind "teams" }}Exact{{ else }}Prefix{{ end }}
+            backend:
+              service:
+                name: {{ include "heinzel.fullname" $ }}
+                port:
+                  name: {{ $port }}
+{{- end }}
+{{- end }}

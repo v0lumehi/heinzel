@@ -10,6 +10,7 @@ Start here when you pick up work on Heinzel. Read `docs/ARCHITECTURE.md` for the
 - External tools: MCP client + built-in web fetch (docs/TOOLS.md). Self-hosted SearXNG verified; GitLab's official MCP server and Atlassian Rovo not tested yet.
 - Coding sessions (docs/CODING.md): verified end to end with a real LLM, the Docker runner, OpenCode 2.0.32, the egress proxy and a local git daemon (branch pushed). Not yet against a real GitLab (push options → MR).
 - Docker images build: `docker build -t heinzel .` and `docker build -t heinzel-coder coder/`.
+- Helm chart `deploy/helm/heinzel` verified in kind (2 replicas, non-root, read-only root fs, probes). CI and release workflows in `.github/workflows` (not yet run on GitHub). Release steps: docs/RELEASING.md; changelog: CHANGELOG.md (add an entry to `[Unreleased]` for user-visible changes).
 
 ## Commands
 

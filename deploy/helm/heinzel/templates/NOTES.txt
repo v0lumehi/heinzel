@@ -1,0 +1,14 @@
+Heinzel {{ .Chart.AppVersion }} is installed as {{ include "heinzel.fullname" . }}.
+
+Check it:
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "heinzel.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "heinzel.fullname" . }}
+
+{{- if .Values.ingress.admin.enabled }}
+Admin UI: https://{{ .Values.ingress.admin.host }}
+{{- else }}
+Admin UI (no ingress): kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "heinzel.fullname" . }} 3080
+{{- end }}
+{{- if .Values.ingress.teams.enabled }}
+Teams messaging endpoint for the Azure Bot: https://{{ .Values.ingress.teams.host }}/api/messages
+{{- end }}

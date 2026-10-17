@@ -112,6 +112,11 @@ const schema = z.object({
   ADMIN_DEV_LOGIN: bool.default(false),
   ADMIN_SESSION_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(12),
 
+  // --- Operations ---
+  /** Port for /healthz and /readyz (Kubernetes probes, Docker healthcheck). 0 disables it. */
+  HEALTH_PORT: z.coerce.number().int().min(0).max(65535).default(8081),
+  HEALTH_HOST: z.string().default("0.0.0.0"),
+
   // --- Behaviour ---
   BOT_NAME: z.string().default("Heinzel"),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),

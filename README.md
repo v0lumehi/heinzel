@@ -73,6 +73,10 @@ Socket Mode means no public URL is needed — it runs fine from a laptop.
 
 **Microsoft Teams:** set `TEAMS_PLAYGROUND=true` and try it locally in the Microsoft 365 Agents Playground, no tenant needed. Setup for a real tenant: [docs/TEAMS.md](docs/TEAMS.md).
 
+### Production
+
+Kubernetes with the Helm chart, signed images, upgrades: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Releases: [CHANGELOG.md](CHANGELOG.md), [docs/RELEASING.md](docs/RELEASING.md). Security: [SECURITY.md](SECURITY.md).
+
 ### Run in Docker
 
 ```bash

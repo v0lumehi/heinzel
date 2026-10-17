@@ -218,6 +218,15 @@ export class McpHub {
     await Promise.all(this.connections.map((c) => c.close()));
   }
 
+  /** Replaces all servers (config changed at runtime). Tools are briefly unavailable while reconnecting. */
+  async restart(servers: McpServers): Promise<void> {
+    const old = this.connections.splice(0);
+    await Promise.all(old.map((c) => c.close()));
+    this.reports = [];
+    this.exposed = [];
+    await this.start(servers);
+  }
+
   private wrap(conn: McpConnection, tool: McpTool): AgentTool {
     const description = (tool.description ?? "").trim() || `${tool.name} (from ${conn.name})`;
     return {

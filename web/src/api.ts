@@ -9,7 +9,7 @@ export function setCsrfToken(token: string | null): void {
 export class NotSignedInError extends Error {}
 
 /** JSON call to the admin API. Writes carry the session's CSRF token. */
-export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown } = {}): Promise<T> {
+export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown } = {}): Promise<T> {
   const method = init.method ?? "GET";
   const headers: Record<string, string> = {};
   if (init.body !== undefined) headers["content-type"] = "application/json";

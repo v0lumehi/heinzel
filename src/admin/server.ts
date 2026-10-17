@@ -9,6 +9,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyRepl
 import type { Logger } from "pino";
 import { z } from "zod";
 import type { Config } from "../config.js";
+import { SettingsError, type RuntimeConfig } from "../core/runtime.js";
 import type { McpServerReport } from "../mcp/hub.js";
 import type { Memory, MemoryStore } from "../memory/memory.js";
 import type { AdminSession, AdminSessionStore } from "../store/admin.js";
@@ -20,6 +21,9 @@ import type {
   ChannelDetailResponse,
   ChannelRow,
   CodingRow,
+  ConfigResponse,
+  McpServerRow,
+  McpTestResponse,
   MeResponse,
   MemoryRow,
   SettingsResponse,
@@ -36,6 +40,8 @@ export interface AdminDeps {
   /** Names of the agent tools and the MCP connection report, for the tools page. */
   tools: () => { builtin: string[]; servers: McpServerReport[] };
   oidc?: OidcLogin;
+  /** Runtime settings and MCP servers editable in the UI. */
+  runtime?: RuntimeConfig;
   log: Logger;
   /** Built web UI (web/dist). Missing = API only. */
   staticDir?: string;
@@ -241,6 +247,60 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
     api.get("/api/tools", async (): Promise<ToolsResponse> => {
       const t = d.tools();
       return { builtin: t.builtin, servers: t.servers.map((s) => ({ server: s.server, error: s.error ?? null, tools: s.tools })) };
+    });
+
+    // ---------------------------------------------------------------- runtime configuration
+
+    const runtime = () => {
+      if (!d.runtime) throw new SettingsError("Runtime configuration is not available");
+      return d.runtime;
+    };
+    api.setErrorHandler((err, _req, reply) => {
+      if (err instanceof SettingsError) return reply.code(400).send({ error: err.message });
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status && status >= 400 && status < 500) return reply.code(status).send({ error: (err as Error).message });
+      d.log.error({ err }, "admin API error");
+      return reply.code(500).send({ error: "Internal error" });
+    });
+
+    api.get("/api/config", async (): Promise<ConfigResponse> => ({ settings: runtime().settings(), canStoreSecrets: !!config.SECRETS_KEY }));
+
+    api.put("/api/config/:key", async (req) => {
+      const body = z.object({ value: z.string().max(2000).nullable() }).strict().safeParse(req.body);
+      if (!body.success) throw new SettingsError("Expected { value: string | null }");
+      await runtime().updateSetting((req.params as { key: string }).key, body.data.value, actor(req));
+      return { ok: true };
+    });
+
+    const mcpInput = z
+      .object({
+        url: z.string().url(),
+        headers: z.record(z.string().max(100), z.string().max(4000)).default({}),
+        tools: z.array(z.string().min(1).max(200)).max(500).nullable().default(null),
+        exclude: z.array(z.string().min(1).max(200)).max(500).default([]),
+        enabled: z.boolean().default(true),
+        timeoutMs: z.number().int().min(1000).max(600_000).default(60_000),
+      })
+      .strict();
+    const parseMcp = (req: FastifyRequest) => {
+      const parsed = mcpInput.safeParse(req.body);
+      if (!parsed.success) throw new SettingsError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+      return { name: (req.params as { name: string }).name, ...parsed.data };
+    };
+
+    api.get("/api/mcp", async (): Promise<McpServerRow[]> => runtime().mcpServers());
+    api.put("/api/mcp/:name", async (req) => {
+      await runtime().saveMcpServer(parseMcp(req), actor(req));
+      return { ok: true };
+    });
+    api.delete("/api/mcp/:name", async (req, reply) => {
+      if (!(await runtime().deleteMcpServer((req.params as { name: string }).name, actor(req)))) return reply.code(404).send({ error: "Unknown server" });
+      return { ok: true };
+    });
+    // A write (admin + CSRF): it makes an outgoing connection with the given credentials.
+    api.post("/api/mcp/:name/test", async (req): Promise<McpTestResponse> => {
+      const r = await runtime().testMcpServer(parseMcp(req));
+      return { error: r.error ?? null, tools: r.tools };
     });
 
     api.get("/api/audit", async (req): Promise<AuditRow[]> => (await d.store.listAudit({ target: (req.query as { target?: string }).target || undefined, limit: 500 })).map(auditRow));

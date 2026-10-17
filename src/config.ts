@@ -112,6 +112,18 @@ const schema = z.object({
   ADMIN_DEV_LOGIN: bool.default(false),
   ADMIN_SESSION_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(12),
 
+  // --- Runtime settings (see docs/ADMIN.md) ---
+  /**
+   * Settings the admin UI must not change, comma-separated, or "*" for all. Locked settings keep the value from the
+   * environment; use this when configuration is managed as code (Helm values, GitOps).
+   */
+  LOCKED_SETTINGS: z.string().default(""),
+  /**
+   * Key for secrets stored in the database (MCP server headers entered in the admin UI): 32 random bytes, base64.
+   * Generate with `openssl rand -base64 32`. Without it the admin UI cannot store secrets.
+   */
+  SECRETS_KEY: optionalString,
+
   // --- Operations ---
   /** Port for /healthz and /readyz (Kubernetes probes, Docker healthcheck). 0 disables it. */
   HEALTH_PORT: z.coerce.number().int().min(0).max(65535).default(8081),
@@ -141,6 +153,44 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema>;
 
+/** Settings that can be changed at runtime in the admin UI. Everything else is deployment configuration. */
+export const RUNTIME_SETTINGS = [
+  { key: "LLM_MODEL_AGENT", kind: "text", group: "Models", label: "Agent model", help: "Answers and tool use. Gateway model id." },
+  { key: "LLM_MODEL_TRIAGE", kind: "text", group: "Models", label: "Triage model", help: "Decides whether to speak up unprompted. Small and cheap." },
+  { key: "LLM_MODEL_HEAVY", kind: "text", group: "Models", label: "Heavy model", help: "Optional strong model for hard tasks. Empty disables it." },
+  { key: "HEAVY_DAILY_LIMIT", kind: "number", group: "Models", label: "Heavy runs per channel and day", help: "" },
+  { key: "AMBIENT_DEFAULT", kind: "boolean", group: "Ambient mode", label: "On for new channels", help: "Channels can change it with !ambient or here per channel." },
+  { key: "AMBIENT_DAILY_LIMIT", kind: "number", group: "Ambient mode", label: "Unprompted posts per channel and day", help: "Default; channels can override it." },
+  { key: "AMBIENT_THREAD_COOLDOWN_MIN", kind: "number", group: "Ambient mode", label: "Minutes between unprompted posts in a thread", help: "" },
+  { key: "AMBIENT_MIN_CONFIDENCE", kind: "number", group: "Ambient mode", label: "Minimum triage confidence", help: "0 to 1. Higher = speaks up less often." },
+  { key: "CONTEXT_MESSAGES", kind: "number", group: "Agent", label: "Messages of context", help: "Prior messages of a thread or channel the agent reads." },
+  { key: "AGENT_MAX_STEPS", kind: "number", group: "Agent", label: "Tool rounds per answer", help: "" },
+  { key: "AGENT_MAX_STEPS_HEAVY", kind: "number", group: "Agent", label: "Tool rounds per heavy answer", help: "" },
+  { key: "WEB_FETCH", kind: "boolean", group: "Agent", label: "Read web pages", help: "Built-in web__fetch_url tool (private addresses are always refused)." },
+  { key: "EVENTS_RETENTION_DAYS", kind: "number", group: "Data", label: "Keep message copies (days)", help: "0 = keep forever. Memories are kept either way." },
+  { key: "CODING_REPOSITORIES", kind: "text", group: "Coding sessions", label: "Allowed repositories", help: 'Comma-separated patterns, e.g. "team/*,tools/heinzel".' },
+  { key: "CODING_MODEL", kind: "text", group: "Coding sessions", label: "Coding model", help: "Empty = heavy model, else agent model." },
+  { key: "CODING_TIMEOUT_MIN", kind: "number", group: "Coding sessions", label: "Timeout (minutes)", help: "" },
+  { key: "CODING_MAX_RUNNING", kind: "number", group: "Coding sessions", label: "Sessions at the same time", help: "" },
+] as const satisfies readonly { key: keyof Config; kind: "text" | "number" | "boolean"; group: string; label: string; help: string }[];
+
+export type RuntimeKey = (typeof RUNTIME_SETTINGS)[number]["key"];
+
+export function isRuntimeKey(key: string): key is RuntimeKey {
+  return RUNTIME_SETTINGS.some((s) => s.key === key);
+}
+
+/** Validates a runtime setting given as text, exactly like the environment variable. Empty text unsets optional values. */
+export function parseSetting(key: RuntimeKey, raw: string): { ok: true; value: Config[RuntimeKey] } | { ok: false; error: string } {
+  const field = schema.shape[key] as z.ZodType;
+  const parsed = field.safeParse(raw);
+  return parsed.success ? { ok: true, value: parsed.data as Config[RuntimeKey] } : { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
+}
+
+export function lockedSettings(config: Config): Set<string> {
+  return new Set(config.LOCKED_SETTINGS.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
 /**
  * Loads `.env` from the working directory into process.env, if the file exists.
  * Variables already set in the environment win (Docker, CI, shell exports).
@@ -160,6 +210,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         for (const key of ["TEAMS_APP_PASSWORD", "TEAMS_TENANT_ID"] as const) {
           if (!c[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when TEAMS_APP_ID is set" });
         }
+      }
+      if (c.SECRETS_KEY && Buffer.from(c.SECRETS_KEY, "base64").length !== 32) {
+        ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "must be 32 bytes, base64-encoded (openssl rand -base64 32)" });
       }
       if (c.ADMIN_OIDC_ISSUER) {
         for (const key of ["ADMIN_OIDC_CLIENT_ID", "ADMIN_OIDC_CLIENT_SECRET"] as const) {

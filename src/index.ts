@@ -16,6 +16,9 @@ import { OpenAiCompatibleClient } from "./llm/client.js";
 import { loadMcpConfig } from "./mcp/config.js";
 import { McpHub } from "./mcp/hub.js";
 import { MemoryStore } from "./memory/memory.js";
+import { RuntimeConfig } from "./core/runtime.js";
+import { SecretBox } from "./crypto.js";
+import { SettingsStore } from "./store/settings.js";
 import { JobQueue } from "./queue/queue.js";
 import { Worker } from "./queue/worker.js";
 import { AdminSessionStore } from "./store/admin.js";
@@ -75,13 +78,22 @@ if (adapters.size === 0) {
 }
 
 const mcp = new McpHub({ log: log.child({ component: "mcp" }), maxResultChars: config.TOOL_RESULT_MAX_CHARS });
-await mcp.start(mcpServers);
+// Applies settings and MCP servers from the admin UI on top of the environment, and connects the MCP servers.
+const runtime = new RuntimeConfig({
+  config,
+  env: process.env,
+  db,
+  settings: new SettingsStore(db),
+  store,
+  mcp,
+  fileServers: mcpServers,
+  secrets: config.SECRETS_KEY ? new SecretBox(config.SECRETS_KEY) : null,
+  log: log.child({ component: "settings" }),
+});
+await runtime.start();
 
-const tools: AgentTool[] = [
-  ...defaultTools,
-  ...(config.WEB_FETCH ? [createWebFetchTool({ maxChars: config.TOOL_RESULT_MAX_CHARS }) as AgentTool] : []),
-  ...mcp.tools,
-];
+const webFetch = createWebFetchTool({ maxChars: config.TOOL_RESULT_MAX_CHARS }) as AgentTool;
+const tools = (): AgentTool[] => [...defaultTools, ...(config.WEB_FETCH ? [webFetch] : []), ...mcp.tools];
 let coding: { runner: DockerRunner; sessions: CodingStore } | undefined;
 if (config.CODING_ENABLED) {
   coding = { runner: new DockerRunner(), sessions: new CodingStore(db) };
@@ -127,8 +139,9 @@ if (config.ADMIN_OIDC_ISSUER || config.ADMIN_DEV_LOGIN) {
       memory,
       sessions: new AdminSessionStore(db),
       coding: coding?.sessions,
-      tools: () => ({ builtin: tools.filter((t) => !t.source).map((t) => t.name), servers: mcp.report }),
+      tools: () => ({ builtin: tools().filter((t) => !t.source).map((t) => t.name), servers: mcp.report }),
       oidc,
+      runtime,
       log: log.child({ component: "admin" }),
     });
     await admin.listen({ port: config.ADMIN_PORT, host: config.ADMIN_HOST });
@@ -170,6 +183,7 @@ async function shutdown(signal: string): Promise<void> {
   for (const a of adapters.values()) await a.stop().catch((err) => log.warn({ err }, "adapter stop failed"));
   await admin?.close().catch((err) => log.warn({ err }, "admin UI stop failed"));
   await worker.stop();
+  await runtime.stop().catch(() => {});
   await mcp.stop();
   await health.close().catch(() => {});
   await db.end();

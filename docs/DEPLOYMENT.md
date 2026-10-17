@@ -18,7 +18,8 @@ kubectl -n heinzel create secret generic heinzel \
   --from-literal=DATABASE_URL='postgres://…' \
   --from-literal=LLM_API_KEY='…' \
   --from-literal=TEAMS_APP_PASSWORD='…' \
-  --from-literal=ADMIN_OIDC_CLIENT_SECRET='…'
+  --from-literal=ADMIN_OIDC_CLIENT_SECRET='…' \
+  --from-literal=SECRETS_KEY="$(openssl rand -base64 32)"
 
 helm install heinzel oci://ghcr.io/v0lumehi/charts/heinzel --version <version> -n heinzel -f values.yaml
 ```
@@ -42,7 +43,7 @@ ingress:
   teams: { enabled: true, host: heinzel-teams.example.com, tlsSecretName: heinzel-teams-tls }
 ```
 
-All settings are the environment variables from `.env.example`: non-secret ones under `config`, secret ones in the Secret. MCP servers go under `mcp` (the content of `mcp.json`). See `deploy/helm/heinzel/values.yaml` for everything else (replicas, resources, NetworkPolicy, scheduling).
+Models, limits and HTTP MCP servers can also be managed in the admin UI; to keep them in Git only, set `LOCKED_SETTINGS: "*"` under `config` (docs/ADMIN.md). All settings are the environment variables from `.env.example`: non-secret ones under `config`, secret ones in the Secret. MCP servers go under `mcp` (the content of `mcp.json`). See `deploy/helm/heinzel/values.yaml` for everything else (replicas, resources, NetworkPolicy, scheduling).
 
 What the chart does for you:
 - Non-root, read-only root filesystem, no capabilities, RuntimeDefault seccomp; the service account token is only mounted when coding sessions run on Kubernetes.

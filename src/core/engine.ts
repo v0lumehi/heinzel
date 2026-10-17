@@ -24,7 +24,8 @@ export interface EngineDeps {
   llm: LlmClient;
   adapters: Map<Platform, ChatAdapter>;
   log: Logger;
-  tools?: AgentTool[];
+  /** Agent tools; a function is asked on every run, so tool servers can change at runtime. */
+  tools?: AgentTool[] | (() => AgentTool[]);
   /** Coding sessions; used when CODING_ENABLED=true. */
   coding?: { runner: CodingRunner; sessions: CodingStore };
   now?: () => Date;
@@ -39,15 +40,16 @@ export interface EngineDeps {
  *   triage ──► ignore | remember | follow_up (job later) | reply (job "respond", ambient)
  */
 export class Engine {
-  private readonly tools: AgentTool[];
-  /** MCP servers behind the external tools, for the system prompt. */
-  private readonly toolSources: string[];
+  private readonly baseTools: () => AgentTool[];
+  /** Tools the engine adds itself (coding). */
+  private readonly ownTools: AgentTool[] = [];
   private readonly now: () => Date;
   readonly coding: CodingCoordinator | null = null;
 
   constructor(private readonly d: EngineDeps) {
     this.now = d.now ?? (() => new Date());
-    const tools = [...(d.tools ?? defaultTools)];
+    const base = d.tools ?? defaultTools;
+    this.baseTools = typeof base === "function" ? base : () => base;
     if (d.config.CODING_ENABLED && d.coding) {
       this.coding = new CodingCoordinator({
         config: d.config,
@@ -65,10 +67,17 @@ export class Engine {
           },
         },
       });
-      tools.push(createCodingTool(this.coding) as AgentTool);
+      this.ownTools.push(createCodingTool(this.coding) as AgentTool);
     }
-    this.tools = tools;
-    this.toolSources = [...new Set(this.tools.map((t) => t.source).filter((s): s is string => !!s))];
+  }
+
+  private get tools(): AgentTool[] {
+    return [...this.baseTools(), ...this.ownTools];
+  }
+
+  /** MCP servers behind the external tools, for the system prompt and !status. */
+  private get toolSources(): string[] {
+    return [...new Set(this.tools.map((t) => t.source).filter((s): s is string => !!s))];
   }
 
   // ---------------------------------------------------------------- ingest

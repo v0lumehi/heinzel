@@ -92,3 +92,50 @@ export interface SettingsResponse {
   codingEnabled: boolean;
   platforms: string[];
 }
+
+export interface ConfigSettingRow {
+  key: string;
+  kind: "text" | "number" | "boolean";
+  group: string;
+  label: string;
+  help: string;
+  value: string;
+  /** admin = changed in this UI, deployment = environment / Helm values, default = built-in default. */
+  source: "admin" | "deployment" | "default";
+  locked: boolean;
+  deploymentValue: string;
+  updatedBy: string | null;
+}
+
+export interface ConfigResponse {
+  settings: ConfigSettingRow[];
+  /** Whether SECRETS_KEY is set, i.e. MCP servers with headers can be stored. */
+  canStoreSecrets: boolean;
+}
+
+export interface McpServerInputBody {
+  url: string;
+  headers: Record<string, string>;
+  tools: string[] | null;
+  exclude: string[];
+  enabled: boolean;
+  timeoutMs: number;
+}
+
+export interface McpServerRow {
+  name: string;
+  source: "deployment" | "admin";
+  url: string | null;
+  headerNames: string[];
+  tools: string[] | null;
+  exclude: string[];
+  enabled: boolean;
+  timeoutMs: number;
+  updatedBy: string | null;
+  status: { server: string; error?: string; tools: { name: string; exposedAs: string | null }[] } | null;
+}
+
+export interface McpTestResponse {
+  error: string | null;
+  tools: { name: string; exposedAs: string | null }[];
+}

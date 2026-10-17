@@ -1,6 +1,6 @@
 import { Alert, AppShell, Badge, Burger, Button, Center, Group, Loader, NavLink, Paper, Stack, Text, Title } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconChartBar, IconCode, IconHash, IconHistory, IconLogout, IconNotebook, IconTool } from "@tabler/icons-react";
+import { IconAdjustments, IconChartBar, IconCode, IconHash, IconHistory, IconLogout, IconNotebook, IconTool } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router";
 import { api, setCsrfToken, type MeResponse } from "./api";
@@ -9,6 +9,7 @@ import { ChannelDetailPage } from "./pages/ChannelDetail";
 import { ChannelsPage } from "./pages/Channels";
 import { CodingPage } from "./pages/Coding";
 import { MemoriesPage } from "./pages/Memories";
+import { SettingsPage } from "./pages/Settings";
 import { ToolsPage } from "./pages/Tools";
 import { UsagePage } from "./pages/Usage";
 
@@ -18,6 +19,7 @@ const NAV = [
   { to: "/usage", label: "Usage", icon: IconChartBar },
   { to: "/coding", label: "Coding sessions", icon: IconCode },
   { to: "/tools", label: "Tools", icon: IconTool },
+  { to: "/settings", label: "Settings", icon: IconAdjustments },
   { to: "/audit", label: "Audit log", icon: IconHistory },
 ];
 
@@ -115,7 +117,8 @@ function Shell({ me }: { me: MeResponse }) {
           <Route path="/memories" element={<MemoriesPage canEdit={user.role === "admin"} />} />
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/coding" element={<CodingPage />} />
-          <Route path="/tools" element={<ToolsPage />} />
+          <Route path="/tools" element={<ToolsPage canEdit={user.role === "admin"} />} />
+          <Route path="/settings" element={<SettingsPage canEdit={user.role === "admin"} />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="*" element={<Navigate to="/channels" replace />} />
         </Routes>

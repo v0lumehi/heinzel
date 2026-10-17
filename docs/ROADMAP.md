@@ -5,7 +5,9 @@
 - Slack adapter (Socket Mode): mentions, DMs, threads, 👀 acknowledgement, Slack ⇄ markdown conversion
 - Live test with a real Slack workspace and Requesty, including coding sessions
 - Microsoft Teams adapter (Teams SDK v2, HTTP endpoint), verified with the Microsoft 365 Agents Playground (docs/TEAMS.md)
-- Admin UI (docs/ADMIN.md): OIDC single sign-on with admin/viewer roles, channel settings, memories, usage, coding sessions, tools overview, audit log (also for chat commands)
+- Admin UI (docs/ADMIN.md): OIDC single sign-on with admin/viewer roles, channel settings, memories, usage, coding sessions, audit log (also for chat commands)
+- Runtime settings and HTTP MCP servers in the admin UI (encrypted secrets, test connection, live reload on all replicas, LOCKED_SETTINGS for configuration as code)
+- Health endpoints, Helm chart, CI, signed multi-arch releases with SBOM (docs/DEPLOYMENT.md, docs/RELEASING.md)
 - Engine with durable Postgres job queue (retries, backoff, stale-job recovery, dedupe keys)
 - Agent tool loop on any OpenAI-compatible gateway, Requesty metadata for cost attribution
 - Ambient mode per channel: rule pre-filter → triage model → budgeted reply
@@ -42,7 +44,7 @@ The adapter exists (docs/TEAMS.md); what is left needs a tenant:
 - Live-test the GitLab and Atlassian Rovo MCP servers; check the curated `tools` list against the real tool names.
 - Per-channel allowlist of tool servers (column on `channels`, chat command). Today every channel gets every tool.
 - OAuth login for MCP servers that require it (e.g. GitLab's official server): one-time `pnpm mcp:login <server>` with the SDK's OAuth client, refresh tokens stored encrypted in Postgres, re-login hint on failure. Use a dedicated bot account.
-- Reload `mcp.json` without restart; MCP `tools/list_changed` notifications.
+- MCP `tools/list_changed` notifications (servers from the admin UI already reload live; `mcp.json` needs a restart).
 
 ### 5. Memory quality
 - Nightly consolidation job: merge duplicates, drop stale facts, summarize channels.
@@ -50,7 +52,7 @@ The adapter exists (docs/TEAMS.md); what is left needs a tenant:
 - Admin view/edit of memories.
 
 ### 6. Admin UI and governance
-- Manage MCP servers in the UI: remote servers only, encrypted secrets, OAuth sign-in, test connection, hot reload; per-channel tool allowlist.
+- OAuth sign-in for MCP servers; per-channel tool allowlist.
 - Permissions for chat commands (channel owners / admin group).
 - Delete and export everything about one person (GDPR).
 - Org-wide limits (token budget per day), kill switch, costs in currency.

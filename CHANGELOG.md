@@ -10,5 +10,6 @@ Database migrations run automatically at startup.
 - Ambient triage, follow-ups, team memory, heavy-model escalation, chat commands.
 - External tools via MCP and built-in web fetch; coding sessions with OpenCode in isolated containers.
 - Admin UI with OIDC single sign-on, admin/viewer roles and an audit log.
+- Runtime settings and HTTP MCP servers manageable in the admin UI, applied live on all replicas; `LOCKED_SETTINGS`, `SECRETS_KEY`.
 - `/healthz` and `/readyz` on `HEALTH_PORT` (default 8081).
 - Helm chart (`deploy/helm/heinzel`), signed multi-arch images with SBOM and provenance on GHCR, CI.

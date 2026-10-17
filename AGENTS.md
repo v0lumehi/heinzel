@@ -32,7 +32,7 @@ No Docker? Any local Postgres 14+ works. Create an empty database for tests.
 ## Conventions
 
 - TypeScript strict, ESM (`"type": "module"`), NodeNext resolution → relative imports end in `.js`.
-- Versions in use: TypeScript 7, zod 4, openai SDK 7 (chat completions API), @slack/bolt 5 (default import: `import bolt from "@slack/bolt"`), Teams SDK 2.1 (`@microsoft/teams.apps`), Fastify 5, openid-client 6, vitest 5, pino 10. Web UI: React 19, Vite 8, Mantine 9, TanStack Query 5, React Router 8.
+- Versions in use: TypeScript 7, zod 4, openai SDK 7 (chat completions API), @slack/bolt 5 (namespace import: `import * as bolt from "@slack/bolt"`), Teams SDK 2.1 (`@microsoft/teams.apps`), Fastify 5, openid-client 6, vitest 5, pino 10. Web UI: React 19, Vite 8, Mantine 9, TanStack Query 5, React Router 8.
 - pnpm workspace: root = server, `web/` = admin UI. API shapes live in `src/admin/types.ts` (no imports; the UI imports it).
 - New dependencies: pin an exact version that is at least two weeks old.
 - Code, comments and docs in English. User-facing chat replies follow the language of the conversation.

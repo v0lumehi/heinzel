@@ -17,7 +17,9 @@ Database migrations run automatically at startup.
 
 ### Project
 - Contributing guide, code of conduct, issue and pull request templates, CODEOWNERS.
-- Test coverage in CI (Codecov), CodeQL code scanning, OpenSSF Scorecard.
+- Test coverage in CI (Codecov), CodeQL code scanning, OpenSSF Scorecard, OpenSSF Best Practices badge (passing).
+- Property-based tests with fast-check for parsers and security checks; tests for adapters, worker, Docker runner, LLM client and egress proxy.
+- Releases attach the Helm chart with a Sigstore bundle.
 
 ### Security
 - Images based on Debian 13 (trixie) with current security updates; no known high or critical vulnerabilities in the Heinzel image.

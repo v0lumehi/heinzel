@@ -122,6 +122,24 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
     expect((await app.inject({ method: "DELETE", url: `/api/memories/${m.id}`, headers: { cookie, "x-csrf-token": csrf } })).statusCode).toBe(404);
   });
 
+  it("serves usage, tools, settings, coding sessions and the audit log", async () => {
+    const { cookie } = await signIn();
+    await store.recordUsage({ channelKey: "slack:C1", purpose: "agent", model: "agent-model", promptTokens: 100, completionTokens: 20 });
+    const get = async <T>(url: string) => (await app.inject({ url, headers: { cookie } })).json<T>();
+    const usage = await get<{ days: number; byChannel: { channelKey: string; calls: number }[]; byDay: { model: string }[] }>("/api/usage?days=30");
+    expect(usage.days).toBe(30);
+    expect(usage.byChannel).toMatchObject([{ channelKey: "slack:C1", calls: 1 }]);
+    expect(usage.byDay[0]).toMatchObject({ model: "agent-model" });
+    expect((await get<{ days: number }>("/api/usage?days=999")).days).toBe(7);
+    expect(await get("/api/tools")).toMatchObject({ builtin: ["remember"], servers: [{ server: "search", error: null }] });
+    expect(await get("/api/settings")).toMatchObject({ botName: "Heinzel", ambientDailyLimit: 5, codingEnabled: false });
+    expect(await get("/api/coding")).toEqual([]);
+    expect(Array.isArray(await get("/api/audit"))).toBe(true);
+    expect((await app.inject({ url: "/api/config", headers: { cookie } })).statusCode).toBe(400); // no runtime configuration in this setup
+    expect((await app.inject({ url: "/api/channels/slack%3ANOPE", headers: { cookie } })).statusCode).toBe(404);
+    expect((await app.inject({ url: "/auth/login" })).statusCode).toBe(404); // no SSO configured
+  });
+
   it("signs out by deleting the session", async () => {
     const { cookie, csrf } = await signIn();
     expect((await app.inject({ method: "POST", url: "/auth/logout", headers: { cookie, "x-csrf-token": csrf } })).statusCode).toBe(200);

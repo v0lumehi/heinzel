@@ -22,6 +22,14 @@ cosign verify ghcr.io/v0lumehi/heinzel:<version> \
 docker buildx imagetools inspect ghcr.io/v0lumehi/heinzel:<version> --format '{{ json .SBOM }}'
 ```
 
+The Helm chart archive on each GitHub release comes with a Sigstore bundle:
+
+```bash
+cosign verify-blob heinzel-<version>.tgz --bundle heinzel-<version>.tgz.sigstore.json \
+  --certificate-identity-regexp 'https://github.com/v0lumehi/heinzel/.github/workflows/release.yml@refs/tags/v.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 ## Security model in short
 
 - Heinzel acts only under its own bot identity and never as a user. Bot messages cannot trigger commands (no bot loops).

@@ -1,4 +1,5 @@
-import bolt from "@slack/bolt";
+// Namespace import: works in Node and in Vitest (the default import is empty under Vitest).
+import * as bolt from "@slack/bolt";
 import type { Logger } from "pino";
 import type { ChatAdapter, ChatEvent, EventHandler, OutboundMessage, PlatformStatus, SentMessage } from "../../core/types.js";
 import {

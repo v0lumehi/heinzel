@@ -9,6 +9,7 @@ spec:
   podSelector:
     matchLabels:
       {{- include "heinzel.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
   policyTypes: [Ingress]
   ingress:
     # Admin UI and Teams endpoint only via the ingress controller.

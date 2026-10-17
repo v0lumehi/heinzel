@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
 import pino from "pino";
 import { OidcLogin } from "./admin/auth.js";
 import { buildAdminServer } from "./admin/server.js";
 import { defaultTools, type AgentTool } from "./agent/tools.js";
 import { createWebFetchTool } from "./agent/webfetch.js";
 import { DockerRunner } from "./coding/docker.js";
+import { KubernetesRunner } from "./coding/kubernetes.js";
+import type { CodingRunner } from "./coding/runner.js";
 import { loadConfig, loadDotEnv } from "./config.js";
 import { SlackAdapter } from "./adapters/slack/adapter.js";
 import { TeamsAdapter } from "./adapters/teams/adapter.js";
@@ -94,9 +97,17 @@ await runtime.start();
 
 const webFetch = createWebFetchTool({ maxChars: config.TOOL_RESULT_MAX_CHARS }) as AgentTool;
 const tools = (): AgentTool[] => [...defaultTools, ...(config.WEB_FETCH ? [webFetch] : []), ...mcp.tools];
-let coding: { runner: DockerRunner; sessions: CodingStore } | undefined;
+let coding: { runner: CodingRunner; sessions: CodingStore } | undefined;
 if (config.CODING_ENABLED) {
-  coding = { runner: new DockerRunner(), sessions: new CodingStore(db) };
+  const runner =
+    config.CODING_RUNNER === "kubernetes"
+      ? new KubernetesRunner({
+          namespace: config.CODING_K8S_NAMESPACE ?? currentNamespace(),
+          runtimeClassName: config.CODING_K8S_RUNTIME_CLASS,
+          activeDeadlineSeconds: (config.CODING_TIMEOUT_MIN + 10) * 60,
+        })
+      : new DockerRunner();
+  coding = { runner, sessions: new CodingStore(db) };
   // A missing image is not fatal: Heinzel keeps working, sessions fail with a clear message.
   await coding.runner.checkImage(config.CODING_IMAGE).catch((err) => log.error({ err: err.message }, "coding sessions will fail until this is fixed"));
 }
@@ -191,3 +202,12 @@ async function shutdown(signal: string): Promise<void> {
 }
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
+
+/** Namespace of this pod, for coding Jobs when CODING_K8S_NAMESPACE is not set. */
+function currentNamespace(): string {
+  try {
+    return readFileSync("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "utf8").trim();
+  } catch {
+    return "default";
+  }
+}

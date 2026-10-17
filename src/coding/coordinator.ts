@@ -243,6 +243,9 @@ export class CodingCoordinator {
     } else if (!state) {
       status = "failed";
       error = "the coding container disappeared";
+    } else if (state.error) {
+      status = "failed";
+      error = state.error;
     } else if (state.oomKilled) {
       status = "failed";
       error = `out of memory (limit ${config.CODING_MEMORY_MB} MB)`;

@@ -12,6 +12,7 @@ spec:
   type: {{ .Values.service.type }}
   selector:
     {{- include "heinzel.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: app
   ports:
     - { name: teams, port: 3978, targetPort: teams }
     - { name: admin, port: 3080, targetPort: admin }

@@ -1,0 +1,138 @@
+{{- if .Values.coding.enabled }}
+{{- if not .Values.coding.egress.allow }}
+{{- fail "coding.egress.allow must list the hosts coding sessions may reach (LLM gateway, GitLab)." }}
+{{- end }}
+{{- $ns := include "heinzel.codingNamespace" . }}
+# Heinzel creates one Job (plus a Secret with its environment) per coding session in this namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "heinzel.fullname" . }}-coding
+  namespace: {{ $ns }}
+  labels:
+    {{- include "heinzel.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # No get/list: Heinzel writes these Secrets but never reads Secrets back.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "heinzel.fullname" . }}-coding
+  namespace: {{ $ns }}
+  labels:
+    {{- include "heinzel.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "heinzel.fullname" . }}-coding
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "heinzel.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Allowlisting forward proxy: the only way out for coding pods.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "heinzel.fullname" . }}-egress
+  labels:
+    {{- include "heinzel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: egress-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "heinzel.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: egress-proxy
+  template:
+    metadata:
+      labels:
+        {{- include "heinzel.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: egress-proxy
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: proxy
+          image: {{ include "heinzel.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node", "dist/egress/proxy.js"]
+          env:
+            - { name: EGRESS_ALLOW, value: {{ join "," .Values.coding.egress.allow | quote }} }
+            - { name: EGRESS_PORT, value: "3128" }
+          ports:
+            - { name: proxy, containerPort: 3128 }
+          readinessProbe:
+            tcpSocket: { port: proxy }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "heinzel.fullname" . }}-egress
+  labels:
+    {{- include "heinzel.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "heinzel.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: egress-proxy
+  ports:
+    - { name: proxy, port: 3128, targetPort: proxy }
+{{- if .Values.coding.egress.networkPolicy }}
+---
+# Coding pods: no inbound traffic; outbound only DNS and the egress proxy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "heinzel.fullname" . }}-coding
+  namespace: {{ $ns }}
+  labels:
+    {{- include "heinzel.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      heinzel.coding: "true"
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            {{- toYaml .Values.coding.egress.dnsNamespaceSelector | nindent 12 }}
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "heinzel.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: egress-proxy
+      ports:
+        - { port: 3128, protocol: TCP }
+{{- end }}
+{{- end }}

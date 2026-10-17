@@ -10,4 +10,5 @@ spec:
   selector:
     matchLabels:
       {{- include "heinzel.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
 {{- end }}

@@ -80,11 +80,26 @@ serviceAccount:
   name: ""
   annotations: {}
 
-# Coding sessions on Kubernetes (see docs/CODING.md). Requires CODING_ENABLED=true and CODING_RUNNER=kubernetes in `config`.
+# Coding sessions as Kubernetes Jobs (see docs/CODING.md). Also set in `config`: GITLAB_URL, CODING_REPOSITORIES;
+# and CODING_GIT_TOKEN in the Secret. The chart sets CODING_ENABLED, CODING_RUNNER, CODING_IMAGE and the proxy.
 coding:
   enabled: false
-  # Namespace for the coding Jobs; empty = the release namespace. A separate namespace is recommended.
+  # Namespace for the coding Jobs. Use a dedicated namespace: Heinzel may create Secrets and Jobs there.
+  # Empty = the release namespace (only for tests). The namespace must exist.
   namespace: ""
   # RuntimeClass for stronger isolation, e.g. gvisor or kata (must exist in the cluster).
   runtimeClassName: ""
-  image: ghcr.io/v0lumehi/heinzel-coder
+  image:
+    repository: ghcr.io/v0lumehi/heinzel-coder
+    # Defaults to the chart's appVersion.
+    tag: ""
+  # Coding pods reach the network only through this allowlisting proxy (and DNS); a NetworkPolicy enforces it.
+  egress:
+    # Hosts the coding agent may reach, e.g. [router.eu.requesty.ai, gitlab.example.com, registry.npmjs.org].
+    allow: []
+    # Set to false if your cluster's CNI does not enforce NetworkPolicies (then the proxy is advisory only).
+    networkPolicy: true
+    # Selects the cluster DNS for the egress NetworkPolicy.
+    dnsNamespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system

@@ -73,6 +73,36 @@ Commands (in the session's thread; in DMs the newest session):
 
 Further settings (`.env.example`): `CODING_MODEL` (default: `LLM_MODEL_HEAVY`, else `LLM_MODEL_AGENT`), `CODING_LLM_BASE_URL`/`CODING_LLM_API_KEY` (a separate key makes cost and revocation easy), `CODING_TIMEOUT_MIN` (45), `CODING_MAX_RUNNING` (2), `CODING_MEMORY_MB` (4096), `CODING_CPUS` (2), `CODING_NO_PROXY` (e.g. a GitLab on the internal network).
 
+## Setup (Kubernetes)
+
+With the Helm chart (docs/DEPLOYMENT.md), every session runs as a Kubernetes **Job** in a dedicated namespace:
+
+```yaml
+config:
+  GITLAB_URL: https://gitlab.example.com
+  CODING_REPOSITORIES: "team/*"
+coding:
+  enabled: true
+  namespace: heinzel-coding          # create it first; Heinzel may create Jobs and Secrets there
+  runtimeClassName: gvisor           # optional, recommended (gVisor or Kata must be installed)
+  egress:
+    allow: [router.eu.requesty.ai, gitlab.example.com]
+# Secret: CODING_GIT_TOKEN (and optionally CODING_LLM_API_KEY)
+```
+
+What the chart sets up:
+- A **Role** in the coding namespace that lets Heinzel create, watch and delete Jobs, read their pods and logs, and write (never read) Secrets.
+- Per session: a Job (one pod, no retries, deadline) and a Secret with its environment (git token, LLM key) owned by the Job, so both disappear together. The pod gets no service account token, a RuntimeDefault seccomp profile, no privilege escalation, `cap-drop ALL` plus the five capabilities needed to drop privileges, and CPU/memory limits.
+- The **egress proxy** (same image, `dist/egress/proxy.js`) with the allowlist, and a **NetworkPolicy** that allows coding pods only DNS and the proxy.
+
+NetworkPolicies only work if your cluster's network plugin enforces them (Calico, Cilium, Azure Network Policy Manager, …). Check it once after installing; this must print `BLOCKED`:
+
+```bash
+kubectl -n heinzel-coding run nettest --rm -i --restart=Never --labels=heinzel.coding=true \
+  --image=ghcr.io/v0lumehi/heinzel-coder:<version> --command -- \
+  node -e "fetch('https://example.com',{signal:AbortSignal.timeout(8000)}).then(()=>console.log('REACHED: not isolated'),()=>console.log('BLOCKED'))"
+```
+
 ## Security model
 
 The coding agent runs arbitrary commands, and its input (the thread, issue texts, repository content) can contain prompt injections. The design assumes the agent may be tricked and limits what that can achieve:
@@ -83,14 +113,14 @@ The coding agent runs arbitrary commands, and its input (the thread, issue texts
 | Exfiltrating code or secrets | Containers sit on an internal network without internet. The only way out is the egress proxy, which allows only `EGRESS_ALLOW` hosts (LLM gateway, GitLab). |
 | Stealing the git token | The token is only visible to root in the container. The agent runs as the unprivileged user `coder`, cannot read root's environment or the credentialed clone in `/srv`, and its commits leave `/workspace` only as a git bundle, so hooks or git config it writes never run with the token. |
 | Pushing to the wrong place | The push target is fixed by Heinzel (`heinzel/<id>-…` in the configured repository). The project access token cannot push to protected branches. The MR is a draft. |
-| Breaking out / hogging the host | `cap-drop ALL` (plus the five capabilities needed to drop privileges), `no-new-privileges`, memory, CPU and PID limits, timeout. Heinzel reaches Docker only through a filtering socket proxy. |
+| Breaking out / hogging the host | `cap-drop ALL` (plus the five capabilities needed to drop privileges), `no-new-privileges`, memory, CPU and PID limits, timeout. Docker: Heinzel reaches Docker only through a filtering socket proxy. Kubernetes: a namespaced Role, no service account token in coding pods, optional gVisor/Kata RuntimeClass. |
 | The LLM key | The agent needs it to work. Use a separate key (`CODING_LLM_API_KEY`) with its own budget; it can only be used against the allowed gateway. |
 
 What remains: the agent can read everything in the repository and send it to your LLM gateway, and it can push arbitrary content to its own branch. Review the merge request like any other contribution.
 
 ## Limits and next steps
 
-- Runner: Docker only. A Kubernetes runner (Job per session, NetworkPolicy instead of the proxy network) implements the same `CodingRunner` interface (`src/coding/runner.ts`).
+- Runners: Docker (`src/coding/docker.ts`) and Kubernetes Jobs (`src/coding/kubernetes.ts`, `CODING_RUNNER=kubernetes`), both behind `CodingRunner` (`src/coding/runner.ts`). A session whose pod cannot be scheduled waits until `CODING_TIMEOUT_MIN`.
 - Backends: OpenCode only. GitLab Duo Agent Platform is planned as a second backend (`backend` column on `coding_sessions`): for customers with DAP, sessions would run on their GitLab runners.
 - One task per session; follow-up requests in the same thread start a new session (continuing a session is planned).
 - Push options create merge requests on GitLab only. On other hosts the branch is pushed and the final message says so.

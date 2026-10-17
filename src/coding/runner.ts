@@ -1,4 +1,4 @@
-/** Starts and observes coding containers. Docker today; a Kubernetes runner would implement the same interface. */
+/** Starts and observes coding containers: Docker (docker.ts) or Kubernetes Jobs (kubernetes.ts). */
 export interface CodingRunner {
   /** Throws with an actionable message if the image is missing. */
   checkImage(image: string): Promise<void>;
@@ -26,6 +26,8 @@ export interface RunnerState {
   running: boolean;
   exitCode: number | null;
   oomKilled: boolean;
+  /** Why it never ran (e.g. the image could not be pulled), if known. */
+  error?: string;
 }
 
 export interface LogLine {

@@ -77,6 +77,12 @@ const schema = z.object({
   /** Comma-separated repository patterns sessions may target, e.g. "team/*,tools/heinzel". */
   CODING_REPOSITORIES: z.string().default("*"),
   CODING_IMAGE: z.string().default("heinzel-coder:latest"),
+  /** Where coding containers run: "docker" (Docker Engine API, DOCKER_HOST) or "kubernetes" (a Job per session; Heinzel must run in the cluster). */
+  CODING_RUNNER: z.enum(["docker", "kubernetes"]).default("docker"),
+  /** Namespace for coding Jobs (kubernetes runner). Default: the namespace Heinzel runs in. */
+  CODING_K8S_NAMESPACE: optionalString,
+  /** RuntimeClass for coding pods, e.g. gvisor or kata (kubernetes runner). */
+  CODING_K8S_RUNTIME_CLASS: optionalString,
   /** Docker network for coding containers (the internal network behind the egress proxy). */
   CODING_DOCKER_NETWORK: optionalString,
   /** Proxy the coding containers must use, e.g. http://egress-proxy:3128. */

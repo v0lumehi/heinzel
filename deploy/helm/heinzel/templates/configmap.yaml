@@ -12,7 +12,11 @@ data:
   MCP_CONFIG: /config/mcp.json
   {{- end }}
   {{- if .Values.coding.enabled }}
+  CODING_ENABLED: "true"
+  CODING_RUNNER: kubernetes
+  CODING_IMAGE: {{ printf "%s:%s" .Values.coding.image.repository (default .Chart.AppVersion .Values.coding.image.tag) | quote }}
   CODING_K8S_NAMESPACE: {{ include "heinzel.codingNamespace" . | quote }}
+  CODING_PROXY_URL: {{ printf "http://%s-egress.%s.svc.cluster.local:3128" (include "heinzel.fullname" .) .Release.Namespace | quote }}
   {{- with .Values.coding.runtimeClassName }}
   CODING_K8S_RUNTIME_CLASS: {{ . | quote }}
   {{- end }}

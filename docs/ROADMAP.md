@@ -8,6 +8,7 @@
 - Admin UI (docs/ADMIN.md): OIDC single sign-on with admin/viewer roles, channel settings, memories, usage, coding sessions, audit log (also for chat commands)
 - Runtime settings and HTTP MCP servers in the admin UI (encrypted secrets, test connection, live reload on all replicas, LOCKED_SETTINGS for configuration as code)
 - Health endpoints, Helm chart, CI, signed multi-arch releases with SBOM (docs/DEPLOYMENT.md, docs/RELEASING.md)
+- Kubernetes runner for coding sessions: Job per session, owned Secret, namespaced Role, egress proxy and NetworkPolicy in the chart
 - Engine with durable Postgres job queue (retries, backoff, stale-job recovery, dedupe keys)
 - Agent tool loop on any OpenAI-compatible gateway, Requesty metadata for cost attribution
 - Ambient mode per channel: rule pre-filter → triage model → budgeted reply
@@ -37,7 +38,6 @@ The adapter exists (docs/TEAMS.md); what is left needs a tenant:
 ### 3. Coding sessions, next
 - Live test against a real GitLab (push options → draft MR; protected branches).
 - GitLab Duo Agent Platform as a second backend for customers who use DAP (sessions run on their GitLab runners).
-- Kubernetes runner (Job per session, NetworkPolicy, pod logs) next to the Docker runner.
 - Continue a session in the same thread ("also add a test") instead of starting a new one.
 
 ### 4. More from tools

@@ -12,10 +12,12 @@ spec:
   selector:
     matchLabels:
       {{- include "heinzel.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
   template:
     metadata:
       labels:
         {{- include "heinzel.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

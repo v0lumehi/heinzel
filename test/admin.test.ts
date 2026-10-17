@@ -133,7 +133,11 @@ describe.skipIf(!TEST_DATABASE_URL)("admin server", () => {
     expect(usage.byChannel).toMatchObject([{ channelKey: "slack:C1", calls: 1 }]);
     expect(usage.byDay[0]).toMatchObject({ model: "agent-model" });
     expect((await get<{ days: number }>("/api/usage?days=999")).days).toBe(7);
-    expect(await get("/api/tools")).toMatchObject({ builtin: ["remember"], servers: [{ server: "search", error: null }] });
+    const tools = await get<{ builtin: { name: string; enabled: boolean }[]; servers: unknown[] }>("/api/tools");
+    expect(tools.builtin.find((b) => b.name === "remember")).toMatchObject({ enabled: true });
+    expect(tools.builtin.find((b) => b.name === "start_coding_task")).toMatchObject({ enabled: false });
+    expect(tools.servers).toMatchObject([{ server: "search", error: null }]);
+    expect((await get<{ id: string }[]>("/api/mcp/catalog")).map((e) => e.id)).toEqual(["searxng", "gitlab", "atlassian"]);
     expect(await get("/api/settings")).toMatchObject({ botName: "Heinzel", ambientDailyLimit: 5, codingEnabled: false });
     expect(await get("/api/coding")).toEqual([]);
     expect(Array.isArray(await get("/api/audit"))).toBe(true);

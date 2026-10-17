@@ -11,6 +11,7 @@ Database migrations run automatically at startup.
 - External tools via MCP and built-in web fetch; coding sessions with OpenCode in isolated containers.
 - Admin UI with OIDC single sign-on, admin/viewer roles and an audit log; setup page with readiness checks, platform status and guided Slack/Teams setup (manifest and app package downloads). Each check links to its fix or shows the deployment snippet; recommended checks can be marked as decided.
 - Coding sessions on Kubernetes (`CODING_RUNNER=kubernetes`): a Job per session with RBAC, egress proxy and NetworkPolicy from the Helm chart.
+- Integration catalog in the admin UI (web search, GitLab, Jira/Confluence) with connection test and tool selection, plus custom MCP servers; plain-language descriptions of the built-in tools.
 - Runtime settings and HTTP MCP servers manageable in the admin UI, applied live on all replicas; `LOCKED_SETTINGS`, `SECRETS_KEY`.
 - `/healthz` and `/readyz` on `HEALTH_PORT` (default 8081).
 - Helm chart (`deploy/helm/heinzel`), signed multi-arch images with SBOM and provenance on GHCR, CI.

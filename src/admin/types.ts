@@ -79,8 +79,36 @@ export interface UsageResponse {
   byDay: { day: string; model: string; purpose: string; calls: number; promptTokens: number; completionTokens: number }[];
 }
 
+export interface BuiltinToolRow {
+  name: string;
+  title: string;
+  what: string;
+  how: string;
+  enabled: boolean;
+}
+
+export interface CatalogEntryRow {
+  id: string;
+  name: string;
+  description: string;
+  verified: boolean;
+  defaultName: string;
+  docsUrl: string;
+  requires: string | null;
+  fields: { key: string; label: string; help: string; secret: boolean; placeholder: string | null; default: string | null }[];
+  tools: string[] | null;
+  exclude: string[];
+}
+
+export interface CatalogSaveBody {
+  name: string;
+  values: Record<string, string>;
+  /** Tools chosen after a connection test; omitted = the entry's defaults. */
+  tools?: string[] | null;
+}
+
 export interface ToolsResponse {
-  builtin: string[];
+  builtin: BuiltinToolRow[];
   servers: { server: string; error: string | null; tools: { name: string; exposedAs: string | null }[] }[];
 }
 

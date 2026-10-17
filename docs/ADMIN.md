@@ -9,7 +9,7 @@ A web UI to look after Heinzel: channel settings, team memory, usage, coding ses
 | Memories | Search across all scopes (channel, organization, person) and delete |
 | Usage | LLM calls and tokens per channel and per day/model (1, 7, 30, 90 days) |
 | Coding sessions | All sessions with status and merge request |
-| Tools | Models in use, built-in tools; MCP servers: add, test the connection, choose tools, edit, remove |
+| Tools | Models in use, built-in tools with what they do, an integration catalog (web search, GitLab, Jira/Confluence: fill in URL and token, test, pick tools) and custom MCP servers |
 | Settings | Models, ambient defaults, agent limits, data retention, coding sessions — applied immediately on all instances |
 | Audit log | Every change, from the UI and from chat commands (`!ambient`, `!limit`, `!instructions`), plus sign-ins |
 

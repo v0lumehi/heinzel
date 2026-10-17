@@ -12,6 +12,10 @@ Everything here is designed to run in your own infrastructure: web search is a s
 - Text content only (HTML, plain text, JSON, XML); PDFs and images are not read. At most 3 MB per page, 20 s timeout.
 - Fetching a page does not search: for "what is the weather in Berlin" Heinzel also needs the search server (below).
 
+## Admin UI
+
+The *Tools* page of the [admin UI](ADMIN.md) offers the integrations below as a catalog: fill in the URL and token, test the connection, choose the tools, save. Tokens are stored encrypted (`SECRETS_KEY`) and changes apply without a restart. Any other HTTP MCP server can be added as a custom server. New catalog entries live in `src/mcp/catalog.ts`.
+
 ## MCP setup
 
 1. Copy the example and point Heinzel at it:

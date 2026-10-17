@@ -1,23 +1,24 @@
-import { ActionIcon, Alert, Badge, Button, Group, Modal, NumberInput, Paper, SimpleGrid, Stack, Switch, Table, Text, TextInput, Title } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, Badge, Button, Checkbox, Group, Modal, NumberInput, Paper, SimpleGrid, Stack, Switch, Table, Text, TextInput, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconEyeOff, IconPlus, IconTrash } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, type ConfigResponse, type McpServerInputBody, type McpServerRow, type McpTestResponse, type SettingsResponse, type ToolsResponse } from "../api";
+import { api, type CatalogEntryRow, type ConfigResponse, type McpServerInputBody, type McpServerRow, type McpTestResponse, type SettingsResponse, type ToolsResponse } from "../api";
 import { Loaded, PageHeader, SectionTitle } from "../components";
 import { SecretsKeyHint } from "./Settings";
 
 export function ToolsPage({ canEdit }: { canEdit: boolean }) {
   const tools = useQuery({ queryKey: ["tools"], queryFn: () => api<ToolsResponse>("/api/tools") });
   const servers = useQuery({ queryKey: ["mcp"], queryFn: () => api<McpServerRow[]>("/api/mcp") });
+  const catalog = useQuery({ queryKey: ["mcp-catalog"], queryFn: () => api<CatalogEntryRow[]>("/api/mcp/catalog") });
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api<SettingsResponse>("/api/settings") });
   const config = useQuery({ queryKey: ["config"], queryFn: () => api<ConfigResponse>("/api/config") });
   const [editing, setEditing] = useState<McpServerRow | "new" | null>(null);
+  const [connecting, setConnecting] = useState<CatalogEntryRow | null>(null);
+  const names = new Set((servers.data ?? []).map((s) => s.name));
   return (
     <>
-      <PageHeader title="Tools">
-        {canEdit && <Button leftSection={<IconPlus size={16} />} onClick={() => setEditing("new")}>Add MCP server</Button>}
-      </PageHeader>
+      <PageHeader title="Tools" />
       {settings.data && (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} mb="lg">
           <Model label="Agent model" value={settings.data.models.agent} />
@@ -26,17 +27,70 @@ export function ToolsPage({ canEdit }: { canEdit: boolean }) {
           <Model label="Coding model" value={settings.data.models.coding} />
         </SimpleGrid>
       )}
+
+      <SectionTitle>Built-in tools</SectionTitle>
+      <Text size="sm" c="dimmed" mb="sm" maw={760}>
+        Heinzel decides on its own when to use a tool, based on the conversation. These tools are part of Heinzel and need no setup.
+      </Text>
       <Loaded query={tools}>
         {(t) => (
-          <>
-            <SectionTitle>Built-in</SectionTitle>
-            <Group gap="xs">
-              {t.builtin.map((name) => <Badge key={name} variant="light" tt="none">{name}</Badge>)}
-            </Group>
-          </>
+          <SimpleGrid cols={{ base: 1, md: 2 }}>
+            {t.builtin.map((b) => (
+              <Paper withBorder p="md" key={b.name} style={b.enabled ? undefined : { opacity: 0.6 }}>
+                <Group justify="space-between" mb={4} wrap="nowrap">
+                  <Text fw={600}>{b.title}</Text>
+                  <Badge variant="light" color={b.enabled ? "green" : "gray"}>{b.enabled ? "on" : "off"}</Badge>
+                </Group>
+                <Text size="sm" mb={6}>{b.what}</Text>
+                <Text size="xs" c="dimmed">{b.how}</Text>
+                <Text size="xs" c="dimmed" ff="monospace" mt={6}>{b.name}</Text>
+              </Paper>
+            ))}
+          </SimpleGrid>
         )}
       </Loaded>
-      <SectionTitle>MCP servers</SectionTitle>
+
+      <SectionTitle>Integrations</SectionTitle>
+      <Text size="sm" c="dimmed" mb="sm" maw={760}>
+        Connect the systems your team works with. Heinzel reaches them through MCP servers. Tokens are stored encrypted, and changes apply
+        without a restart.
+      </Text>
+      <Loaded query={catalog}>
+        {(entries) => (
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} mb="md">
+            {entries.map((e) => (
+              <Paper withBorder p="md" key={e.id}>
+                <Stack gap={6} h="100%">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text fw={600}>{e.name}</Text>
+                    {e.verified ? (
+                      <Badge variant="light" color="green">verified</Badge>
+                    ) : (
+                      <Tooltip label="Prepared from the vendor's documentation, not yet tested against the real service">
+                        <Badge variant="light" color="gray">not verified</Badge>
+                      </Tooltip>
+                    )}
+                  </Group>
+                  <Text size="sm" style={{ flex: 1 }}>{e.description}</Text>
+                  <Group justify="space-between" mt={4}>
+                    <Anchor href={e.docsUrl} target="_blank" rel="noreferrer" size="xs">How to set it up</Anchor>
+                    {names.has(e.defaultName) ? (
+                      <Badge variant="outline" color="green">connected as {e.defaultName}</Badge>
+                    ) : (
+                      canEdit && <Button size="xs" onClick={() => setConnecting(e)}>Connect</Button>
+                    )}
+                  </Group>
+                </Stack>
+              </Paper>
+            ))}
+          </SimpleGrid>
+        )}
+      </Loaded>
+
+      <Group justify="space-between" mt="xl" mb="sm">
+        <Title order={4}>Connected servers</Title>
+        {canEdit && <Button variant="default" size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing("new")}>Custom MCP server</Button>}
+      </Group>
       <Text size="sm" c="dimmed" mb="sm" maw={760}>
         Servers from the deployment (mcp.json) are read-only here. Servers you add here must be reachable over HTTP (streamable HTTP). Servers
         that run as a command on the Heinzel host (stdio) can only be set up in the deployment.
@@ -44,7 +98,7 @@ export function ToolsPage({ canEdit }: { canEdit: boolean }) {
       <Loaded query={servers}>
         {(rows) => (
           <Stack>
-            {rows.length === 0 && <Text c="dimmed">No MCP servers configured.</Text>}
+            {rows.length === 0 && <Text c="dimmed">No servers connected yet.</Text>}
             {rows.map((s) => (
               <ServerCard key={s.name} server={s} canEdit={canEdit} onEdit={() => setEditing(s)} />
             ))}
@@ -58,7 +112,111 @@ export function ToolsPage({ canEdit }: { canEdit: boolean }) {
           onClose={() => setEditing(null)}
         />
       )}
+      {connecting && (
+        <CatalogForm
+          entry={connecting}
+          taken={names}
+          canStoreSecrets={config.data?.canStoreSecrets ?? true}
+          onClose={() => setConnecting(null)}
+        />
+      )}
     </>
+  );
+}
+
+function CatalogForm({ entry, taken, canStoreSecrets, onClose }: { entry: CatalogEntryRow; taken: Set<string>; canStoreSecrets: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(taken.has(entry.defaultName) ? `${entry.defaultName}-2` : entry.defaultName);
+  const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(entry.fields.map((f) => [f.key, f.default ?? ""])));
+  const [test, setTest] = useState<McpTestResponse | null>(null);
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const needsSecret = entry.fields.some((f) => f.secret);
+  const complete = name.trim() !== "" && entry.fields.every((f) => (values[f.key] ?? "").trim() !== "");
+
+  const runTest = useMutation({
+    mutationFn: () => api<McpTestResponse>(`/api/mcp/catalog/${entry.id}/test`, { method: "POST", body: { name: name.trim(), values } }),
+    onSuccess: (r) => {
+      setTest(r);
+      if (!r.error) setPicked(new Set(r.tools.filter((t) => t.exposedAs).map((t) => t.name)));
+    },
+    onError: (err) => setTest({ error: err.message, tools: [] }),
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/api/mcp/catalog/${entry.id}`, { method: "PUT", body: { name: name.trim(), values, ...(picked ? { tools: [...picked] } : {}) } }),
+    onSuccess: () => {
+      notifications.show({ message: `${entry.name} connected`, color: "green" });
+      void qc.invalidateQueries({ queryKey: ["mcp"] });
+      void qc.invalidateQueries({ queryKey: ["tools"] });
+      onClose();
+    },
+    onError: (err) => notifications.show({ title: "Not saved", message: err.message, color: "red" }),
+  });
+
+  return (
+    <Modal opened onClose={onClose} title={`Connect ${entry.name}`} size="lg">
+      <Stack>
+        {needsSecret && <SecretsKeyHint canStoreSecrets={canStoreSecrets} />}
+        <Text size="sm">{entry.description}</Text>
+        {entry.requires && <Alert color="blue">Needs: {entry.requires}</Alert>}
+        {entry.fields.map((f) => (
+          <TextInput
+            key={f.key}
+            label={f.label}
+            description={f.help}
+            placeholder={f.placeholder ?? undefined}
+            type={f.secret ? "password" : "text"}
+            autoComplete="off"
+            value={values[f.key] ?? ""}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setValues((old) => ({ ...old, [f.key]: v }));
+              setTest(null);
+              setPicked(null);
+            }}
+            required
+          />
+        ))}
+        <TextInput
+          label="Name"
+          description="Prefix of the tool names (name__tool). Letters, digits and '-', at most 20 characters."
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+        />
+        {test?.error && <Alert color="red" title="Connection failed">{test.error}</Alert>}
+        {test && !test.error && (
+          <Paper withBorder p="sm">
+            <Text size="sm" fw={500} mb={4}>Connected. Choose the tools Heinzel may use:</Text>
+            <Text size="xs" c="dimmed" mb="xs">The preselection follows the recommendation for this integration.</Text>
+            <Stack gap={4} mah={260} style={{ overflowY: "auto" }}>
+              {test.tools.map((t) => (
+                <Checkbox
+                  key={t.name}
+                  label={<Text size="sm" ff="monospace">{t.name}</Text>}
+                  checked={picked?.has(t.name) ?? false}
+                  onChange={(e) => {
+                    const on = e.currentTarget.checked;
+                    setPicked((old) => {
+                      const next = new Set(old ?? []);
+                      if (on) next.add(t.name);
+                      else next.delete(t.name);
+                      return next;
+                    });
+                  }}
+                />
+              ))}
+            </Stack>
+          </Paper>
+        )}
+        <Group justify="space-between">
+          <Anchor href={entry.docsUrl} target="_blank" rel="noreferrer" size="sm">How to set it up</Anchor>
+          <Group>
+            <Button variant="default" onClick={() => runTest.mutate()} loading={runTest.isPending} disabled={!complete}>Test connection</Button>
+            <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!complete || (!!test && !test.error && picked?.size === 0)}>Save</Button>
+          </Group>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 

@@ -11,6 +11,8 @@ import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { APP_ID_PATTERN, teamsAppPackage } from "../adapters/teams/manifest.js";
 import { slackManifest } from "../adapters/slack/manifest.js";
+import { CATALOG, buildCatalogServer } from "../mcp/catalog.js";
+import { BUILTIN_TOOLS } from "./builtins.js";
 import type { Config } from "../config.js";
 import type { Platform, PlatformStatus } from "../core/types.js";
 import { SettingsError, type RuntimeConfig } from "../core/runtime.js";
@@ -24,6 +26,8 @@ import { roleFromClaims, splitList, type OidcLogin, type PendingLogin } from "./
 import type {
   AuditRow,
   ChannelDetailResponse,
+  CatalogEntryRow,
+  CatalogSaveBody,
   ChannelRow,
   CodingRow,
   ConfigResponse,
@@ -257,7 +261,12 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
 
     api.get("/api/tools", async (): Promise<ToolsResponse> => {
       const t = d.tools();
-      return { builtin: t.builtin, servers: t.servers.map((s) => ({ server: s.server, error: s.error ?? null, tools: s.tools })) };
+      const enabled = (name: string) =>
+        name === "escalate" ? !!config.LLM_MODEL_HEAVY : name === "start_coding_task" ? config.CODING_ENABLED : t.builtin.includes(name);
+      return {
+        builtin: BUILTIN_TOOLS.map((b) => ({ ...b, enabled: enabled(b.name) })),
+        servers: t.servers.map((s) => ({ server: s.server, error: s.error ?? null, tools: s.tools })),
+      };
     });
 
     // ---------------------------------------------------------------- runtime configuration
@@ -300,6 +309,49 @@ export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
     };
 
     api.get("/api/mcp", async (): Promise<McpServerRow[]> => runtime().mcpServers());
+
+    api.get("/api/mcp/catalog", async (): Promise<CatalogEntryRow[]> =>
+      CATALOG.map((e) => ({
+        id: e.id,
+        name: e.name,
+        description: e.description,
+        verified: e.verified,
+        defaultName: e.defaultName,
+        docsUrl: e.docsUrl,
+        requires: e.requires ?? null,
+        fields: e.fields.map((f) => ({ key: f.key, label: f.label, help: f.help, secret: f.secret, placeholder: f.placeholder ?? null, default: f.default ?? null })),
+        tools: e.tools,
+        exclude: e.exclude,
+      })),
+    );
+
+    const catalogInput = (req: FastifyRequest) => {
+      const entry = CATALOG.find((e) => e.id === (req.params as { id: string }).id);
+      if (!entry) throw new SettingsError("Unknown integration");
+      const body = z
+        .object({ name: z.string().min(1).max(20), values: z.record(z.string().max(100), z.string().max(4000)), tools: z.array(z.string().min(1).max(200)).max(500).nullable().optional() })
+        .strict()
+        .safeParse(req.body);
+      if (!body.success) throw new SettingsError("Expected a name and the integration's fields");
+      const data: CatalogSaveBody = body.data;
+      let conn: { url: string; headers: Record<string, string> };
+      try {
+        conn = buildCatalogServer(entry, data.values);
+      } catch (err) {
+        throw new SettingsError(err instanceof Error ? err.message : String(err));
+      }
+      // Tools picked after a test replace the entry's defaults.
+      const picked = data.tools !== undefined;
+      return { name: data.name, ...conn, tools: picked ? (data.tools ?? null) : entry.tools, exclude: picked ? [] : entry.exclude, enabled: true, timeoutMs: 60_000 };
+    };
+    api.post("/api/mcp/catalog/:id/test", async (req): Promise<McpTestResponse> => {
+      const r = await runtime().testMcpServer(catalogInput(req));
+      return { error: r.error ?? null, tools: r.tools };
+    });
+    api.put("/api/mcp/catalog/:id", async (req) => {
+      await runtime().saveMcpServer(catalogInput(req), actor(req));
+      return { ok: true };
+    });
     api.put("/api/mcp/:name", async (req) => {
       await runtime().saveMcpServer(parseMcp(req), actor(req));
       return { ok: true };

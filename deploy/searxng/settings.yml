@@ -1,0 +1,18 @@
+# Minimal SearXNG config for Heinzel: internal-only service, JSON API on.
+# The secret comes from SEARXNG_SECRET (see .env.example).
+use_default_settings: true
+
+general:
+  instance_name: "heinzel-search"
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json
+
+server:
+  # Only reachable from the compose network; no public limiter needed.
+  limiter: false
+  image_proxy: false
+  public_instance: false

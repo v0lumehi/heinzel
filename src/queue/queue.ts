@@ -8,6 +8,10 @@ export interface JobPayloads {
   triage: { eventId: number; botInThread: boolean };
   /** Check back on a thread that may have gone quiet. */
   followup: { channelKey: string; threadRef: string; note: string; scheduledAfterEventId: number };
+  /** Start the container of a confirmed coding session. */
+  coding_start: { sessionId: number };
+  /** Read progress of a running coding session; re-enqueues itself until the session ends. */
+  coding_watch: { sessionId: number };
 }
 
 export type JobKind = keyof JobPayloads;

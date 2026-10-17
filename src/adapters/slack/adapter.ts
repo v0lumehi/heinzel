@@ -80,6 +80,10 @@ export class SlackAdapter implements ChatAdapter {
     return { messageId: res.ts, threadId: m.threadId ?? res.ts };
   }
 
+  async update(channelId: string, messageId: string, text: string): Promise<void> {
+    await this.app.client.chat.update({ channel: channelId, ts: messageId, text: markdownToMrkdwn(text, (name) => this.userIdByName(name)) });
+  }
+
   async fetchThread(channelId: string, threadId: string, limit: number): Promise<ChatEvent[]> {
     const res = await this.app.client.conversations.replies({ channel: channelId, ts: threadId, limit: Math.min(limit, 200) });
     const msgs = (res.messages ?? []) as SlackMessageLike[];

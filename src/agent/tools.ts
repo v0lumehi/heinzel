@@ -20,6 +20,10 @@ export interface AgentTool<A = unknown> {
   args: z.ZodType<A>;
   /** JSON Schema shown to the model. Kept explicit so it is readable and portable across providers. */
   parameters: Record<string, unknown>;
+  /** Name of the MCP server this tool comes from; unset for built-in tools. */
+  source?: string;
+  /** Only offered when a person addressed Heinzel directly (never in ambient, thread-triage or follow-up runs). */
+  directOnly?: boolean;
   run(args: A, ctx: ToolContext): Promise<string>;
 }
 

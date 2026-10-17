@@ -3,11 +3,15 @@ import type { Config } from "../config.js";
 import { buildSystemPrompt, finalInstruction, renderTranscript, type RespondMode } from "../agent/prompt.js";
 import { isSilent, runAgent } from "../agent/runner.js";
 import { defaultTools, escalateTool, followupDedupeKey, memoryScopes, type AgentTool, type ToolContext } from "../agent/tools.js";
+import { CodingCoordinator } from "../coding/coordinator.js";
+import type { CodingRunner } from "../coding/runner.js";
+import { createCodingTool } from "../coding/tool.js";
 import type { LlmClient } from "../llm/client.js";
 import type { Memory, MemoryStore } from "../memory/memory.js";
 import type { JobHandlers } from "../queue/worker.js";
 import type { JobPayloads, JobQueue } from "../queue/queue.js";
 import { checkSpeakBudget, preFilter, triageMessage } from "../triage/triage.js";
+import type { CodingStore } from "../store/coding.js";
 import type { BotPostKind, ChannelSettings, Store, StoredEvent } from "../store/store.js";
 import { cleanForPrompt, helpText, parseCommand, type Command } from "./commands.js";
 import { parseChannelKey, type ChatAdapter, type ChatEvent, type Platform } from "./types.js";
@@ -21,6 +25,8 @@ export interface EngineDeps {
   adapters: Map<Platform, ChatAdapter>;
   log: Logger;
   tools?: AgentTool[];
+  /** Coding sessions; used when CODING_ENABLED=true. */
+  coding?: { runner: CodingRunner; sessions: CodingStore };
   now?: () => Date;
 }
 
@@ -34,11 +40,35 @@ export interface EngineDeps {
  */
 export class Engine {
   private readonly tools: AgentTool[];
+  /** MCP servers behind the external tools, for the system prompt. */
+  private readonly toolSources: string[];
   private readonly now: () => Date;
+  readonly coding: CodingCoordinator | null = null;
 
   constructor(private readonly d: EngineDeps) {
-    this.tools = d.tools ?? defaultTools;
     this.now = d.now ?? (() => new Date());
+    const tools = [...(d.tools ?? defaultTools)];
+    if (d.config.CODING_ENABLED && d.coding) {
+      this.coding = new CodingCoordinator({
+        config: d.config,
+        sessions: d.coding.sessions,
+        store: d.store,
+        runner: d.coding.runner,
+        queue: d.queue,
+        log: d.log.child({ component: "coding" }),
+        now: this.now,
+        chat: {
+          post: async (key, threadRef, text) => (await this.postToThread(key, threadRef, text)).messageId,
+          update: async (key, messageId, text) => {
+            const { platform, channelId } = parseChannelKey(key);
+            await this.adapter(platform).update?.(channelId, messageId, text);
+          },
+        },
+      });
+      tools.push(createCodingTool(this.coding) as AgentTool);
+    }
+    this.tools = tools;
+    this.toolSources = [...new Set(this.tools.map((t) => t.source).filter((s): s is string => !!s))];
   }
 
   // ---------------------------------------------------------------- ingest
@@ -81,6 +111,8 @@ export class Engine {
       respond: (p) => this.respond(p),
       triage: (p) => this.triage(p),
       followup: (p) => this.followup(p),
+      coding_start: async (p) => this.coding?.start(p.sessionId),
+      coding_watch: async (p) => this.coding?.watch(p.sessionId),
     };
   }
 
@@ -248,6 +280,7 @@ export class Engine {
             ? `Heavy model runs (24h): ${await store.heavyRunsLast24h(channel.channelKey)}/${config.HEAVY_DAILY_LIMIT}`
             : "Heavy model: not configured",
           `Instructions: ${channel.instructions ? "set (`!instructions` to show)" : "none"}`,
+          `External tools: ${this.toolSources.length ? this.toolSources.join(", ") : "none"}`,
         ].join("\n");
         break;
       }
@@ -281,6 +314,19 @@ export class Engine {
           limit: 15,
         });
         reply = found.length ? found.map((m) => `#${m.id} [${m.scope}] ${m.content}`).join("\n") : "I don't remember anything matching that here.";
+        break;
+      }
+      case "go":
+      case "stop":
+      case "coding": {
+        if (!this.coding) {
+          reply = "Coding sessions are not enabled here (CODING_ENABLED).";
+          break;
+        }
+        const userKey = `${ev.platform}:${ev.userId}`;
+        if (cmd.kind === "go") reply = await this.coding.confirm(channel.channelKey, ev.threadId, userKey, cmd.id);
+        else if (cmd.kind === "stop") reply = await this.coding.cancel(channel.channelKey, ev.threadId, cmd.id);
+        else reply = await this.coding.list(channel.channelKey);
         break;
       }
       case "unknown":
@@ -350,6 +396,8 @@ export class Engine {
     const heavyAllowed = await this.heavyAllowed(a.channel.channelKey);
     const rlog = log.child({ channel: a.channel.channelKey, trace: a.traceId });
 
+    // Tools with side effects that need a person's explicit request are not offered when Heinzel speaks on its own.
+    const tools = a.mode === "direct" ? this.tools : this.tools.filter((t) => !t.directOnly);
     const run = async (heavy: { reason: string } | null): Promise<{ text: string; escalation?: { reason: string } }> => {
       const canEscalate = !heavy && heavyAllowed;
       const system = buildSystemPrompt({
@@ -364,6 +412,8 @@ export class Engine {
         now: this.now(),
         canEscalate,
         heavy: heavy ?? undefined,
+        externalTools: this.toolSources,
+        coding: tools.some((t) => t.name === "start_coding_task"),
       });
       const model = heavy ? config.LLM_MODEL_HEAVY! : config.LLM_MODEL_AGENT;
       const purpose = heavy ? "agent_heavy" : "agent";
@@ -374,7 +424,7 @@ export class Engine {
           model,
           system,
           messages: [{ role: "user", content: user }],
-          tools: canEscalate ? [...this.tools, escalateTool as AgentTool] : this.tools,
+          tools: canEscalate ? [...tools, escalateTool as AgentTool] : tools,
           toolContext: a.toolContext,
           maxSteps: heavy ? config.AGENT_MAX_STEPS_HEAVY : config.AGENT_MAX_STEPS,
           meta: { channelKey: a.channel.channelKey, purpose, traceId },
@@ -404,15 +454,24 @@ export class Engine {
     return (await store.heavyRunsLast24h(key)) < config.HEAVY_DAILY_LIMIT;
   }
 
-  /** Sends a message and records it. Failures after sending are logged, never rethrown, so a job retry can't double-post. */
+  /** Sends a reply to an event (top-level in DMs unless the person is in a thread) and records it. */
   private async post(channel: ChannelSettings, replyTo: ChatEvent, text: string, kind: BotPostKind): Promise<void> {
-    const { platform, channelId } = parseChannelKey(channel.channelKey);
-    const adapter = this.adapter(platform);
-    // In DMs, answer top-level unless the person is already in a thread.
     const threadId = replyTo.isDirect && replyTo.threadId === replyTo.messageId ? undefined : replyTo.threadId;
+    await this.deliver(channel.channelKey, threadId, text, kind, replyTo.isDirect);
+  }
+
+  /** Posts into a thread, e.g. coding session updates. */
+  private async postToThread(key: string, threadRef: string, text: string): Promise<{ messageId: string }> {
+    return this.deliver(key, threadRef, text, "reply", false);
+  }
+
+  /** Sends a message and records it. Failures after sending are logged, never rethrown, so a job retry can't double-post. */
+  private async deliver(key: string, threadId: string | undefined, text: string, kind: BotPostKind, isDirect: boolean): Promise<{ messageId: string }> {
+    const { platform, channelId } = parseChannelKey(key);
+    const adapter = this.adapter(platform);
     const sent = await adapter.send({ channelId, threadId, text });
     try {
-      await this.d.store.recordBotPost(channel.channelKey, sent.threadId, sent.messageId, kind);
+      await this.d.store.recordBotPost(key, sent.threadId, sent.messageId, kind);
       await this.d.store.insertEvent({
         platform,
         channelId,
@@ -424,12 +483,13 @@ export class Engine {
         isBot: true,
         isSelf: true,
         mentionsBot: false,
-        isDirect: replyTo.isDirect,
+        isDirect,
         sentAt: this.now(),
       });
     } catch (err) {
-      this.d.log.error({ err, channel: channel.channelKey }, "failed to record bot post");
+      this.d.log.error({ err, channel: key }, "failed to record bot post");
     }
+    return { messageId: sent.messageId };
   }
 
   private async recordUsage(

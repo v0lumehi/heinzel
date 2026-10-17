@@ -55,6 +55,8 @@ export interface ChatAdapter {
   fetchRecent(channelId: string, limit: number): Promise<ChatEvent[]>;
   /** Optional lightweight acknowledgement (e.g. 👀 reaction) while working. */
   acknowledge?(channelId: string, messageId: string): Promise<void>;
+  /** Optional: replace the text of a message Heinzel sent (live status updates). */
+  update?(channelId: string, messageId: string, text: string): Promise<void>;
 }
 
 export function channelKey(platform: Platform, channelId: string): string {

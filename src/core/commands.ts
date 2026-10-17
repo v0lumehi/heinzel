@@ -13,6 +13,9 @@ export type Command =
   | { kind: "instructions-clear" }
   | { kind: "memories"; query: string }
   | { kind: "deep"; text: string }
+  | { kind: "go"; id?: number }
+  | { kind: "stop"; id?: number }
+  | { kind: "coding" }
   | { kind: "unknown"; raw: string };
 
 /** Removes leading mentions like "@Heinzel" so commands and prompts see only the actual message. */
@@ -59,6 +62,17 @@ export function parseCommand(text: string): Command | null {
     case "deep":
     case "think":
       return arg ? { kind: "deep", text: arg } : { kind: "unknown", raw: t };
+    case "go":
+    case "stop":
+    case "cancel": {
+      const kind = head.toLowerCase() === "go" ? "go" : "stop";
+      if (!arg) return { kind };
+      const id = Number(arg.replace(/^#/, ""));
+      return Number.isInteger(id) && id > 0 ? { kind, id } : { kind: "unknown", raw: t };
+    }
+    case "coding":
+    case "sessions":
+      return { kind: "coding" };
     default:
       return { kind: "unknown", raw: t };
   }
@@ -73,5 +87,6 @@ export function helpText(botName: string): string {
     "`!instructions <text>` – standing instructions for this channel (`!instructions` shows, `!instructions clear` removes)",
     "`!memories [query]` – what I remember about this channel",
     "`!deep <question>` – answer with the stronger model right away",
+    "`!go [id]` – start the coding session I prepared in this thread · `!stop [id]` – cancel it · `!coding` – recent sessions",
   ].join("\n");
 }

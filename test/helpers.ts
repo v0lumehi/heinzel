@@ -48,6 +48,7 @@ export class FakeAdapter implements ChatAdapter {
   readonly platform = "slack" as const;
   readonly sent: (OutboundMessage & SentMessage)[] = [];
   readonly acks: string[] = [];
+  readonly updates: { channelId: string; messageId: string; text: string }[] = [];
   history: ChatEvent[] = [];
   private seq = 1000;
 
@@ -67,6 +68,9 @@ export class FakeAdapter implements ChatAdapter {
   }
   async acknowledge(_c: string, messageId: string): Promise<void> {
     this.acks.push(messageId);
+  }
+  async update(channelId: string, messageId: string, text: string): Promise<void> {
+    this.updates.push({ channelId, messageId, text });
   }
 }
 

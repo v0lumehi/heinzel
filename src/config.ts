@@ -49,6 +49,44 @@ const schema = z.object({
   TEAMS_APP_PASSWORD: optionalString,
   TEAMS_TENANT_ID: optionalString,
 
+  // --- External tools ---
+  /** Path to a JSON file with MCP servers (`mcpServers` format, see mcp.example.json). Unset = no MCP tools. */
+  MCP_CONFIG: optionalString,
+  /** Built-in `web__fetch_url` tool: read public web pages (private network addresses are always refused). */
+  WEB_FETCH: bool.default(true),
+  /** Tool results (MCP, web pages) longer than this are cut before they reach the model. */
+  TOOL_RESULT_MAX_CHARS: z.coerce.number().int().min(1_000).max(200_000).default(16_000),
+
+  // --- Coding sessions (see docs/CODING.md) ---
+  /** Let people hand coding tasks to a coding agent (OpenCode) that runs in an isolated container and opens a draft MR. */
+  CODING_ENABLED: bool.default(false),
+  /** Base URL of the git host, e.g. https://gitlab.example.com (also used for the GitLab MCP server). */
+  GITLAB_URL: optionalString,
+  /** Token the coding container clones and pushes with (GitLab project/group access token, role Developer, scope write_repository). */
+  CODING_GIT_TOKEN: optionalString,
+  /** Basic-auth user that goes with the token: "oauth2" for GitLab tokens. */
+  CODING_GIT_USERNAME: z.string().default("oauth2"),
+  CODING_GIT_AUTHOR_EMAIL: z.string().default("heinzel@localhost"),
+  /** Comma-separated repository patterns sessions may target, e.g. "team/*,tools/heinzel". */
+  CODING_REPOSITORIES: z.string().default("*"),
+  CODING_IMAGE: z.string().default("heinzel-coder:latest"),
+  /** Docker network for coding containers (the internal network behind the egress proxy). */
+  CODING_DOCKER_NETWORK: optionalString,
+  /** Proxy the coding containers must use, e.g. http://egress-proxy:3128. */
+  CODING_PROXY_URL: optionalString,
+  /** Hosts the coding containers reach without the proxy (e.g. an internal GitLab on the same network). */
+  CODING_NO_PROXY: optionalString,
+  /** Model for the coding agent. Default: LLM_MODEL_HEAVY, else LLM_MODEL_AGENT. */
+  CODING_MODEL: optionalString,
+  /** LLM endpoint for the coding agent. Default: LLM_BASE_URL / LLM_API_KEY. */
+  CODING_LLM_BASE_URL: optionalString,
+  CODING_LLM_API_KEY: optionalString,
+  CODING_TIMEOUT_MIN: z.coerce.number().int().min(5).max(480).default(45),
+  /** Coding containers running at the same time (across all channels). */
+  CODING_MAX_RUNNING: z.coerce.number().int().min(1).max(50).default(2),
+  CODING_MEMORY_MB: z.coerce.number().int().min(512).default(4096),
+  CODING_CPUS: z.coerce.number().min(0.5).max(64).default(2),
+
   // --- Behaviour ---
   BOT_NAME: z.string().default("Heinzel"),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
@@ -86,7 +124,14 @@ export function loadDotEnv(path = ".env"): void {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = schema.safeParse(env);
+  const parsed = schema
+    .superRefine((c, ctx) => {
+      if (!c.CODING_ENABLED) return;
+      for (const key of ["GITLAB_URL", "CODING_GIT_TOKEN"] as const) {
+        if (!c[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when CODING_ENABLED=true" });
+      }
+    })
+    .safeParse(env);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid configuration:\n${issues}`);

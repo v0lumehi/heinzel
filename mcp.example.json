@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "search": {
+      "url": "${SEARCH_MCP_URL:-http://localhost:3000/mcp}",
+      "tools": ["searxng_web_search"]
+    },
+    "gitlab": {
+      "enabled": false,
+      "url": "${GITLAB_URL}/api/v4/mcp",
+      "headers": { "Authorization": "Bearer ${GITLAB_MCP_TOKEN}" },
+      "tools": [
+        "search", "get_project", "list_projects", "get_repository_file", "list_repository_tree",
+        "get_issue", "create_issue", "get_work_item", "list_work_items", "get_workitem_notes",
+        "list_merge_requests", "get_merge_request", "get_merge_request_diffs", "get_merge_request_notes",
+        "list_commits", "get_commit", "list_pipelines", "get_pipeline", "get_pipeline_jobs", "save_note"
+      ]
+    },
+    "jira": {
+      "enabled": false,
+      "url": "https://mcp.atlassian.com/v1/mcp",
+      "headers": { "Authorization": "Basic ${ATLASSIAN_BASIC_AUTH}" },
+      "exclude": ["create*", "edit*", "update*", "add*", "transition*", "delete*"]
+    }
+  }
+}

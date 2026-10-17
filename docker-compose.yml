@@ -1,3 +1,8 @@
+# Profiles:
+#   (none)   postgres only, for `pnpm dev`
+#   app      Heinzel itself
+#   tools    self-hosted web search: SearXNG + its MCP server
+#   coding   coding sessions: egress proxy, Docker API proxy, isolated network
 services:
   postgres:
     image: postgres:16
@@ -20,11 +25,67 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://heinzel:heinzel@postgres:5432/heinzel
+      SEARCH_MCP_URL: http://mcp-searxng:3000/mcp
+      # Coding sessions talk to Docker through the filtered proxy, never the raw socket.
+      DOCKER_HOST: tcp://docker-proxy:2375
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     profiles: ["app"]
+
+  # --- tools: self-hosted web search -------------------------------------------------------
+  searxng:
+    image: searxng/searxng:2026.10.13-22c64b8d3
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-}  # required: openssl rand -hex 32
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+    profiles: ["tools"]
+
+  mcp-searxng:
+    image: isokoliuk/mcp-searxng:2.6.0
+    environment:
+      SEARXNG_URL: http://searxng:8080
+      MCP_HTTP_PORT: "3000"
+      MCP_HTTP_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:3000:3000" # for `pnpm dev` on the host; Heinzel in compose uses the service name
+    depends_on: [searxng]
+    restart: unless-stopped
+    profiles: ["tools"]
+
+  # --- coding: isolated coding containers ------------------------------------------------
+  # Coding containers live on the internal network "heinzel-coding" without a route to the internet.
+  # Their only way out is this proxy, which allows the hosts in EGRESS_ALLOW (LLM gateway, GitLab).
+  egress-proxy:
+    build: .
+    command: ["node", "dist/egress/proxy.js"]
+    environment:
+      EGRESS_ALLOW: ${EGRESS_ALLOW:-}  # required: LLM gateway and GitLab hosts
+      EGRESS_PORT: "3128"
+    networks: [default, coding]
+    restart: unless-stopped
+    profiles: ["coding"]
+
+  # Heinzel only needs to create, inspect, read logs of and remove containers; everything else is denied.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      POST: "1"
+      DELETE: "1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    profiles: ["coding"]
+
+networks:
+  coding:
+    name: heinzel-coding
+    internal: true
 
 volumes:
   pgdata:

@@ -11,6 +11,8 @@
 - Team memory (channel / org / user scopes, full-text recall, `remember` / `recall` / `forget` tools)
 - Heavy-model escalation (`escalate` tool, triage complexity, `!deep`, daily budget)
 - Chat commands: `!status`, `!ambient`, `!limit`, `!instructions`, `!memories`, `!deep`, `!help`
+- External tools: MCP client (stdio + streamable HTTP, `mcp.json`, allow/exclude lists, `pnpm mcp`), built-in web fetch with SSRF protection. Example config: self-hosted SearXNG, GitLab's official MCP server, Atlassian Rovo (Jira/Confluence)
+- Coding sessions with OpenCode 2 in Docker containers: confirmation by the requester, live status, draft MR via push options, egress allowlist proxy, token isolation (docs/CODING.md)
 - Tests: unit + integration against real Postgres (fake LLM and fake adapter)
 
 ## Next
@@ -30,16 +32,24 @@ Implement `ChatAdapter` with the Microsoft Teams SDK for TypeScript (`@microsoft
 - `fetchThread` / `fetchRecent` need Microsoft Graph (`ChannelMessage.Read.Group` via RSC or app permissions). Fallback: the engine already uses stored history when the adapter throws.
 - Markdown: Teams renders a markdown subset; convert lists/links as needed in the adapter.
 
-### 3. Tools via MCP
-- MCP client so Heinzel can use GitHub, Jira/Linear, Confluence, Google Drive etc. under service accounts.
-- Per-channel allowlist of tools (column on `channels`).
+### 3. Coding sessions, next
+- Live test against a real GitLab (push options → draft MR; protected branches).
+- GitLab Duo Agent Platform as a second backend for customers who use DAP (sessions run on their GitLab runners).
+- Kubernetes runner (Job per session, NetworkPolicy, pod logs) next to the Docker runner.
+- Continue a session in the same thread ("also add a test") instead of starting a new one.
 
-### 4. Memory quality
+### 4. More from tools
+- Live-test the GitLab and Atlassian Rovo MCP servers; check the curated `tools` list against the real tool names.
+- Per-channel allowlist of tool servers (column on `channels`, chat command). Today every channel gets every tool.
+- OAuth login for MCP servers that require it (e.g. GitLab's official server): one-time `pnpm mcp:login <server>` with the SDK's OAuth client, refresh tokens stored encrypted in Postgres, re-login hint on failure. Use a dedicated bot account.
+- Reload `mcp.json` without restart; MCP `tools/list_changed` notifications.
+
+### 5. Memory quality
 - Nightly consolidation job: merge duplicates, drop stale facts, summarize channels.
 - Optional pgvector embeddings behind the same `MemoryStore` interface (embedding model via the gateway).
 - Admin view/edit of memories.
 
-### 5. Admin UI and governance
+### 6. Admin UI and governance
 - Small web UI: channels, settings, memories, usage/costs, audit log.
 - Org-wide limits (token budget per day), kill switch.
 
@@ -53,4 +63,5 @@ Implement `ChatAdapter` with the Microsoft Teams SDK for TypeScript (`@microsoft
 - No streaming: answers are posted once complete.
 - Slack name/channel lookups are cached in memory per process and never refreshed.
 - Edits and deletions of messages are ignored (the stored copy keeps the original text).
-- File contents and images are not read.
+- File contents and images are not read (also PDFs via web fetch).
+- All tool schemas go with every agent call; large MCP servers cost thousands of tokens per call unless `tools` is narrowed.

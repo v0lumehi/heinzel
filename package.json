@@ -14,14 +14,18 @@
     "build": "tsc -p tsconfig.build.json && cp -r src/db/migrations dist/db/",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
+    "mcp": "tsx src/mcp/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@slack/bolt": "^5.1.0",
+    "node-html-markdown": "^2.0.0",
     "openai": "^7.35.0",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
+    "undici": "^8.12.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {

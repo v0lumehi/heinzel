@@ -14,6 +14,7 @@ Heinzel is a single Node.js process (TypeScript, ESM) plus Postgres. It can be s
    respond  ─► context + memory ─► agent run (tool loop) ─► adapter.send
    triage   ─► small model ─► ignore | remember | follow_up | respond
    followup ─► agent run in "followup" mode ─► post or stay SILENT
+   coding_start / coding_watch ─► coding container (see docs/CODING.md)
 
  LLM gateway (OpenAI-compatible, e.g. Requesty EU) ◄── llm/client.ts
 ```
@@ -27,7 +28,11 @@ Heinzel is a single Node.js process (TypeScript, ESM) plus Postgres. It can be s
 | `src/core/commands.ts` | `!`-prefixed admin commands (no LLM involved) |
 | `src/adapters/slack/` | Bolt + Socket Mode; Slack wire format ⇄ plain text / mrkdwn |
 | `src/adapters/teams/` | Planned (see ROADMAP) |
-| `src/agent/` | System prompt, transcript rendering, tool loop, tools (memory, follow-ups, escalate) |
+| `src/agent/` | System prompt, transcript rendering, tool loop, tools (memory, follow-ups, escalate, web fetch) |
+| `src/mcp/` | MCP client: config file, connections (stdio / streamable HTTP), MCP tools as agent tools, `pnpm mcp` |
+| `src/coding/` | Coding sessions: coordinator (confirm, start, watch, finish), Docker runner, OpenCode event parser, `start_coding_task` tool |
+| `src/egress/` | Allowlisting forward proxy for coding containers (runs from the same image) |
+| `coder/` | Coding container image (git + OpenCode 2) and its entrypoint (clone, agent, push with privilege split) |
 | `src/triage/` | Rule pre-filter, triage prompt + parsing, speak budget |
 | `src/llm/client.ts` | `LlmClient` interface and the OpenAI-compatible implementation (Requesty metadata) |
 | `src/memory/` | Scoped team memory on Postgres full-text search |
@@ -44,6 +49,9 @@ Heinzel is a single Node.js process (TypeScript, ESM) plus Postgres. It can be s
 - **Default to silence.** Ambient replies, in-thread replies and follow-ups may answer `SILENT`. Triage output that cannot be parsed is treated as "ignore". Budgets are checked twice: before queueing and again before the agent run.
 - **No double posts on retry.** After a message is sent, bookkeeping failures are logged but never rethrown.
 - **Never act as a user.** Heinzel posts under its own bot identity. Bot messages can never trigger commands or replies (prevents bot loops).
+- **External tools through MCP, not custom code.** Integrations (search, GitLab, Jira, …) are MCP servers from a config file; their tools reach the model as `<server>__<tool>`. Only Heinzel-specific tools (memory, follow-ups) and web fetch are built in. Servers that fail at startup are skipped, dropped connections reconnect on the next call. Tool output is treated as untrusted data in the system prompt; web fetch refuses private network addresses (SSRF).
+- **Self-hostable end to end.** Everything except the LLM can run in the customer's infrastructure: SearXNG for search, the customer's GitLab, coding containers behind an egress allowlist.
+- **Coding in containers, never in Heinzel.** Heinzel only orchestrates: the agent runs in a throwaway container with no internet except the allowlist, and changes leave only as a draft merge request. Long-running work is watched by a chain of short jobs, because the queue re-queues jobs running longer than 10 minutes.
 
 ## Model tiers
 

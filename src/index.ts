@@ -1,4 +1,7 @@
 import pino from "pino";
+import { defaultTools, type AgentTool } from "./agent/tools.js";
+import { createWebFetchTool } from "./agent/webfetch.js";
+import { DockerRunner } from "./coding/docker.js";
 import { loadConfig, loadDotEnv } from "./config.js";
 import { SlackAdapter } from "./adapters/slack/adapter.js";
 import { Engine } from "./core/engine.js";
@@ -6,13 +9,17 @@ import type { ChatAdapter, Platform } from "./core/types.js";
 import { migrate } from "./db/migrate.js";
 import { createPool } from "./db/pool.js";
 import { OpenAiCompatibleClient } from "./llm/client.js";
+import { loadMcpConfig } from "./mcp/config.js";
+import { McpHub } from "./mcp/hub.js";
 import { MemoryStore } from "./memory/memory.js";
 import { JobQueue } from "./queue/queue.js";
 import { Worker } from "./queue/worker.js";
+import { CodingStore } from "./store/coding.js";
 import { Store } from "./store/store.js";
 
 loadDotEnv();
 const config = loadConfig();
+const mcpServers = config.MCP_CONFIG ? loadMcpConfig(config.MCP_CONFIG) : {};
 const log = pino({
   level: config.LOG_LEVEL,
   ...(process.stdout.isTTY ? { transport: { target: "pino-pretty", options: { translateTime: "SYS:HH:MM:ss" } } } : {}),
@@ -47,7 +54,22 @@ if (adapters.size === 0) {
   process.exit(1);
 }
 
-const engine = new Engine({ config, store, memory, queue, llm, adapters, log: log.child({ component: "engine" }) });
+const mcp = new McpHub({ log: log.child({ component: "mcp" }), maxResultChars: config.TOOL_RESULT_MAX_CHARS });
+await mcp.start(mcpServers);
+
+const tools: AgentTool[] = [
+  ...defaultTools,
+  ...(config.WEB_FETCH ? [createWebFetchTool({ maxChars: config.TOOL_RESULT_MAX_CHARS }) as AgentTool] : []),
+  ...mcp.tools,
+];
+let coding: { runner: DockerRunner; sessions: CodingStore } | undefined;
+if (config.CODING_ENABLED) {
+  coding = { runner: new DockerRunner(), sessions: new CodingStore(db) };
+  // A missing image is not fatal: Heinzel keeps working, sessions fail with a clear message.
+  await coding.runner.checkImage(config.CODING_IMAGE).catch((err) => log.error({ err: err.message }, "coding sessions will fail until this is fixed"));
+}
+
+const engine = new Engine({ config, store, memory, queue, llm, adapters, tools, coding, log: log.child({ component: "engine" }) });
 const worker = new Worker(queue, engine.handlers(), log.child({ component: "worker" }), { concurrency: config.WORKER_CONCURRENCY });
 await worker.start();
 
@@ -63,11 +85,12 @@ for (const adapter of adapters.values()) {
   } catch (err) {
     log.fatal({ err, platform: adapter.platform }, "could not connect to chat platform (check tokens and network)");
     await worker.stop();
+    await mcp.stop();
     await db.end();
     process.exit(1);
   }
 }
-log.info({ platforms: [...adapters.keys()], agentModel: config.LLM_MODEL_AGENT, triageModel: config.LLM_MODEL_TRIAGE }, `${config.BOT_NAME} is running`);
+log.info({ platforms: [...adapters.keys()], mcpServers: mcp.servers, coding: !!engine.coding, agentModel: config.LLM_MODEL_AGENT, triageModel: config.LLM_MODEL_TRIAGE }, `${config.BOT_NAME} is running`);
 
 async function housekeeping(): Promise<void> {
   try {
@@ -80,6 +103,12 @@ async function housekeeping(): Promise<void> {
 await housekeeping();
 setInterval(() => void housekeeping(), 6 * 3_600_000).unref();
 
+if (engine.coding) {
+  const maintainCoding = () => engine.coding!.maintain().catch((err) => log.warn({ err }, "coding maintenance failed"));
+  await maintainCoding();
+  setInterval(() => void maintainCoding(), 5 * 60_000).unref();
+}
+
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
@@ -89,6 +118,7 @@ async function shutdown(signal: string): Promise<void> {
   force.unref();
   for (const a of adapters.values()) await a.stop().catch((err) => log.warn({ err }, "adapter stop failed"));
   await worker.stop();
+  await mcp.stop();
   await db.end();
   process.exit(0);
 }

@@ -44,6 +44,7 @@ The adapter exists (docs/TEAMS.md). What is left needs a tenant:
 - Live-test the GitLab and Atlassian Rovo MCP servers. Check the curated `tools` list against the real tool names.
 - Per-channel allowlist of tool servers (column on `channels`, chat command). Today every channel gets every tool.
 - OAuth login for MCP servers that require it (e.g. GitLab's official server): one-time `pnpm mcp:login <server>` with the SDK's OAuth client, refresh tokens stored encrypted in Postgres, re-login hint on failure. Use a dedicated bot account.
+- One optional `heinzel.yaml` for structured configuration (MCP servers today, later channel defaults and tool allowlists), replacing `mcp.json` with a deprecation period. Single values stay environment variables, which take precedence.
 - MCP `tools/list_changed` notifications (servers from the admin UI already reload live, while `mcp.json` needs a restart).
 
 ### 5. Memory quality

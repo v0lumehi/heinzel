@@ -10,6 +10,7 @@ Start here when you pick up work on Heinzel. Read `docs/ARCHITECTURE.md` for the
 - External tools: MCP client + built-in web fetch (docs/TOOLS.md). Self-hosted SearXNG verified. GitLab's official MCP server and Atlassian Rovo not tested yet.
 - Coding sessions (docs/CODING.md): verified end to end with a real LLM, the Docker runner, OpenCode 2.0.32, the egress proxy and a local git daemon (branch pushed). Not yet against a real GitLab (push options → MR).
 - Docker images build: `docker build -t heinzel .` and `docker build -t heinzel-coder coder/`.
+- Released: v0.1.0 (2026-10-17) with signed multi-arch images on GHCR, the Helm chart as OCI and as a signed release asset (signature checked with cosign 3).
 - Helm chart `deploy/helm/heinzel` verified in kind (2 replicas, non-root, read-only root fs, probes). Kubernetes coding runner verified in kind with the pod's own RBAC (Job + owned Secret, logs, state, cleanup, clone via egress proxy). NetworkPolicy enforcement NOT verified (kindnet on colima cannot enforce it: no nfnetlink_queue) — test on Calico/Cilium. CI and release workflows in `.github/workflows` (not yet run on GitHub). Release steps: docs/RELEASING.md. Changelog: CHANGELOG.md (add an entry to `[Unreleased]` for user-visible changes).
 
 ## Commands
@@ -57,7 +58,7 @@ git config user.email "aljic.zijad@gmail.com"
 
 Append a short entry when you stop, so the next person or agent can continue.
 
-- **2026-10-17** — Enterprise/OSS readiness: health endpoints, Helm chart (kind-tested), CI + signed releases, hardened images (Debian 13, no npm, digests), runtime settings + MCP servers in the admin UI (SECRETS_KEY, LOCKED_SETTINGS), Kubernetes coding runner, setup page, README/CONTRIBUTING/templates, coverage (Codecov), CodeQL, Scorecard, ruleset on main. Open: first release tag v0.1.0, Codecov activation, NetworkPolicy check on an enforcing CNI, OpenSSF Best Practices registration.
+- **2026-10-17** — Enterprise/OSS readiness: health endpoints, Helm chart (kind-tested), CI + signed releases, hardened images (Debian 13, no npm, digests), runtime settings + MCP servers in the admin UI (SECRETS_KEY, LOCKED_SETTINGS), Kubernetes coding runner, setup page, README/CONTRIBUTING/templates, coverage (Codecov), CodeQL, Scorecard, ruleset on main. Since then: Codecov active, OpenSSF Best Practices badge (passing), integration catalog in the admin UI, release v0.1.0. Open: make the GHCR packages public, NetworkPolicy check on an enforcing CNI, live test of the GitLab and Atlassian catalog entries.
 
 - **2026-10-17** — Admin UI: Fastify + OIDC (Entra ID app roles Heinzel.Admin/Viewer), Postgres sessions, CSRF header, audit log (migration 004, also for chat commands), React/Mantine UI in `web/` (channels, memories, usage, coding, tools, audit). Docker image builds UI too. Next: MCP servers in the UI, chat command permissions, hosting (Helm/Container Apps), market analysis.
 

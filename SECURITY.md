@@ -13,7 +13,7 @@ Security fixes go into the latest minor release. Run the latest release. Upgrade
 
 ## Verifying releases
 
-Images are signed keylessly with Sigstore and carry an SBOM and SLSA provenance:
+Images are signed keylessly with Sigstore and carry an SBOM and SLSA provenance. Use cosign 3 or later, because the signatures use the current Sigstore bundle format:
 
 ```bash
 cosign verify ghcr.io/v0lumehi/heinzel:<version> \

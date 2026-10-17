@@ -1,4 +1,4 @@
-FROM node:22-trixie-slim AS build
+FROM node:22-trixie-slim@sha256:154ba2f4d6fec323d28e4f4bb86bba4677f1223391a1979cf521304e03a98dfa AS build
 WORKDIR /app
 ENV CI=true
 RUN corepack enable
@@ -11,7 +11,7 @@ COPY web ./web
 # The web UI is bundled by Vite, so its packages are dev dependencies and pruned here.
 RUN pnpm build && pnpm prune --prod
 
-FROM node:22-trixie-slim
+FROM node:22-trixie-slim@sha256:154ba2f4d6fec323d28e4f4bb86bba4677f1223391a1979cf521304e03a98dfa
 # Security updates of the base image. npm, npx and corepack are removed: nothing is downloaded at runtime
 # (supply chain, air-gapped installs). stdio MCP servers are baked into a derived image, see docs/TOOLS.md.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/* \

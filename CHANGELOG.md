@@ -22,3 +22,5 @@ Database migrations run automatically at startup.
 ### Security
 - Images based on Debian 13 (trixie) with current security updates; no known high or critical vulnerabilities in the Heinzel image.
 - The Heinzel image contains no npm, npx or corepack; stdio MCP servers are baked into a derived image (docs/TOOLS.md).
+- Base images pinned by digest; workflow checkouts without persisted credentials; `main` protected against deletion and force pushes.
+- Admin UI: MCP server and header names are validated and stored without prototype (found by CodeQL); Teams text conversion removes nested tag fragments.

@@ -38,7 +38,7 @@ const httpServer = z.object({
 }).strict();
 
 /** Becomes the tool-name prefix (`<server>__<tool>`), so keep it short and simple. */
-const SERVER_NAME = /^[a-zA-Z0-9-]{1,20}$/;
+export const SERVER_NAME = /^[a-zA-Z0-9-]{1,20}$/;
 /** Prefixes taken by built-in tools (`web__fetch_url`). */
 const RESERVED_NAMES = new Set(["web"]);
 

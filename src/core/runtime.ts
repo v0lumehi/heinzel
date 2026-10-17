@@ -3,7 +3,7 @@ import type { Logger } from "pino";
 import { RUNTIME_SETTINGS, isRuntimeKey, lockedSettings, parseSetting, type Config, type RuntimeKey } from "../config.js";
 import type { SecretBox } from "../crypto.js";
 import type { Db } from "../db/pool.js";
-import { parseMcpConfig, type McpServers } from "../mcp/config.js";
+import { SERVER_NAME, parseMcpConfig, type McpServers } from "../mcp/config.js";
 import { McpHub, type McpServerReport } from "../mcp/hub.js";
 import { SettingsStore, type StoredMcpServer } from "../store/settings.js";
 import type { Store } from "../store/store.js";
@@ -190,7 +190,7 @@ export class RuntimeConfig {
   private async mcpConfig(): Promise<McpServers> {
     const fromDb: McpServers = {};
     for (const s of await this.d.settings.mcpServers()) {
-      if (!s.enabled || s.name in this.d.fileServers) continue;
+      if (!s.enabled || Object.hasOwn(this.d.fileServers, s.name)) continue;
       try {
         Object.assign(fromDb, parseMcpConfig({ mcpServers: { [s.name]: this.toRaw(s) } }, this.d.env));
       } catch (err) {
@@ -225,7 +225,7 @@ export class RuntimeConfig {
       status: reports.get(name) ?? null,
     }));
     const db: McpServerView[] = (await this.d.settings.mcpServers())
-      .filter((s) => !(s.name in this.d.fileServers))
+      .filter((s) => !Object.hasOwn(this.d.fileServers, s.name))
       .map((s) => ({
         name: s.name,
         source: "admin",
@@ -243,18 +243,21 @@ export class RuntimeConfig {
 
   /** Validates input and merges headers with the stored ones (empty value = keep). Returns what would be stored. */
   private async prepare(input: McpServerInput): Promise<{ raw: Record<string, unknown>; headers: Record<string, string>; existing: StoredMcpServer | undefined }> {
-    if (input.name in this.d.fileServers) throw new SettingsError(`"${input.name}" is defined in the deployment (mcp.json) and cannot be changed here`);
+    if (!SERVER_NAME.test(input.name)) throw new SettingsError(`"${input.name}": server names may only contain letters, digits and '-' (at most 20 characters)`);
+    if (Object.hasOwn(this.d.fileServers, input.name)) throw new SettingsError(`"${input.name}" is defined in the deployment (mcp.json) and cannot be changed here`);
     const existing = (await this.d.settings.mcpServers()).find((s) => s.name === input.name);
     const stored = existing?.headersEnc ? (JSON.parse(this.box().open(existing.headersEnc)) as Record<string, string>) : {};
-    const headers: Record<string, string> = {};
+    // No prototype: header names come from the admin UI.
+    const headers = Object.create(null) as Record<string, string>;
     for (const [k, v] of Object.entries(input.headers)) {
       const name = k.trim();
       if (!name) continue;
-      const value = v === "" ? stored[name] : v;
+      if (!HEADER_NAME.test(name)) throw new SettingsError(`"${name}" is not a valid header name`);
+      const value = v === "" ? (Object.hasOwn(stored, name) ? stored[name] : undefined) : v;
       if (value === undefined) throw new SettingsError(`Header ${name} needs a value`);
       headers[name] = value;
     }
-    const raw = { url: input.url, headers, ...(input.tools ? { tools: input.tools } : {}), exclude: input.exclude, timeoutMs: input.timeoutMs };
+    const raw = { url: input.url, headers: { ...headers }, ...(input.tools ? { tools: input.tools } : {}), exclude: input.exclude, timeoutMs: input.timeoutMs };
     try {
       parseMcpConfig({ mcpServers: { [input.name]: raw } }, this.d.env);
     } catch (err) {
@@ -288,7 +291,7 @@ export class RuntimeConfig {
   }
 
   async deleteMcpServer(name: string, actor: { actor: string; actorName: string | null }): Promise<boolean> {
-    if (name in this.d.fileServers) throw new SettingsError(`"${name}" is defined in the deployment (mcp.json) and cannot be deleted here`);
+    if (Object.hasOwn(this.d.fileServers, name)) throw new SettingsError(`"${name}" is defined in the deployment (mcp.json) and cannot be deleted here`);
     const deleted = await this.d.settings.deleteMcpServer(name);
     if (deleted) {
       await this.d.store.recordAudit({ ...actor, action: "mcp.delete", target: `mcp:${name}` });
@@ -310,6 +313,9 @@ export class RuntimeConfig {
     }
   }
 }
+
+/** RFC 9110 token characters. */
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,100}$/;
 
 function text(v: unknown): string {
   return v === undefined || v === null ? "" : String(v);

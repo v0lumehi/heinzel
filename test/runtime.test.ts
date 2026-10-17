@@ -133,6 +133,9 @@ describe.skipIf(!TEST_DATABASE_URL)("RuntimeConfig", () => {
     await runtime.saveMcpServer({ ...input, exclude: [] }, who);
 
     await expect(runtime.saveMcpServer({ ...input, name: "search" }, who)).rejects.toThrow(/deployment/);
+    await expect(runtime.saveMcpServer({ ...input, name: "__proto__" }, who)).rejects.toThrow(/server names/);
+    await expect(runtime.saveMcpServer({ ...input, headers: { __proto__x: "1", "bad header": "x" } }, who)).rejects.toThrow(/not a valid header name/);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     await expect(runtime.saveMcpServer({ ...input, name: "web" }, who)).rejects.toThrow(/built-in/);
 
     expect(await runtime.deleteMcpServer("jira", who)).toBe(true);

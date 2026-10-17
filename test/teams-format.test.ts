@@ -83,6 +83,12 @@ describe("teamsToPlainText", () => {
   });
 });
 
+describe("teamsToPlainText with nested tags", () => {
+  it("leaves no tag behind", () => {
+    expect(teamsToPlainText("a <scr<b>ipt>alert(1)</scr</b>ipt> b")).toBe("a alert(1) b");
+  });
+});
+
 describe("markdownToTeams", () => {
   it("turns headings bold and keeps line breaks, but leaves code blocks alone", () => {
     expect(markdownToTeams("# Title\nline one\n- item\n\nnext\n```\na\nb\n```")).toBe("**Title**  \nline one  \n- item\n\nnext  \n```\na\nb\n```");

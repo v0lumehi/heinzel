@@ -57,6 +57,8 @@ git config user.email "aljic.zijad@gmail.com"
 
 Append a short entry when you stop, so the next person or agent can continue.
 
+- **2026-10-17** — Enterprise/OSS readiness: health endpoints, Helm chart (kind-tested), CI + signed releases, hardened images (Debian 13, no npm, digests), runtime settings + MCP servers in the admin UI (SECRETS_KEY, LOCKED_SETTINGS), Kubernetes coding runner, setup page, README/CONTRIBUTING/templates, coverage (Codecov), CodeQL, Scorecard, ruleset on main. Open: first release tag v0.1.0, Codecov activation, NetworkPolicy check on an enforcing CNI, OpenSSF Best Practices registration.
+
 - **2026-10-17** — Admin UI: Fastify + OIDC (Entra ID app roles Heinzel.Admin/Viewer), Postgres sessions, CSRF header, audit log (migration 004, also for chat commands), React/Mantine UI in `web/` (channels, memories, usage, coding, tools, audit). Docker image builds UI too. Next: MCP servers in the UI, chat command permissions, hosting (Helm/Container Apps), market analysis.
 
 - **2026-10-17** — Slack live test done (incl. coding). Teams adapter on the Teams SDK v2: HTTP endpoint, playground mode, 👀 via reactions API, markdown out; `fetchThread`/`fetchRecent` are now optional (engine falls back to stored history). Verified end to end with the headless Agents Playground and a real LLM. Engine/command texts now use `**bold**` (Slack converts). Next: real tenant (Azure Bot, dev tunnel, manifest with RSC), then Graph history (docs/TEAMS.md, ROADMAP §2).

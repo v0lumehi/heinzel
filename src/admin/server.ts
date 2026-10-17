@@ -5,7 +5,7 @@ import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
-import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { Logger } from "pino";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
@@ -73,7 +73,7 @@ export const DEFAULT_STATIC_DIR = fileURLToPath(new URL("../../web/dist", import
 export async function buildAdminServer(d: AdminDeps): Promise<FastifyInstance> {
   const { config } = d;
   const secure = config.ADMIN_PUBLIC_URL.startsWith("https://");
-  const app = Fastify({ loggerInstance: d.log as FastifyBaseLogger, disableRequestLogging: true, trustProxy: secure, bodyLimit: 256 * 1024 });
+  const app = Fastify({ loggerInstance: d.log as FastifyBaseLogger, logController: new LogController({ disableRequestLogging: true }), trustProxy: secure, bodyLimit: 256 * 1024 });
 
   await app.register(cookie);
   await app.register(helmet, {

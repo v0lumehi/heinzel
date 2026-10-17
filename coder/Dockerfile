@@ -1,6 +1,6 @@
 # Heinzel coding container: git + OpenCode, one task per container.
 # Extend it with your project's toolchain (FROM heinzel-coder, then install JDK, Python, …) so the agent can run tests.
-FROM node:22-trixie-slim
+FROM node:22-trixie-slim@sha256:154ba2f4d6fec323d28e4f4bb86bba4677f1223391a1979cf521304e03a98dfa
 ARG OPENCODE_VERSION=2.0.32
 ARG NPM_VERSION=11.21.0
 

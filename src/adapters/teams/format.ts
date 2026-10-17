@@ -60,12 +60,17 @@ export function teamsToChatEvent(a: TeamsActivityLike, botId: string): ChatEvent
 
 /** Turns Teams message text (light HTML with <at> mentions) into readable plain text. */
 export function teamsToPlainText(text: string): string {
-  return text
+  let t = text
     .replace(/<at[^>]*>(.*?)<\/at>/gi, (_, name: string) => `@${name.replace(/\s+/g, "")}`)
     .replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, (_, href: string, label: string) => (label === href ? href : `${label} (${href})`))
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<\/(p|div|li)>/gi, "\n");
+  // Repeat until stable, so nested fragments like "<scr<b>ipt>" leave no tag behind.
+  for (let prev = ""; prev !== t; ) {
+    prev = t;
+    t = t.replace(/<[^<>]*>/g, "");
+  }
+  return t
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

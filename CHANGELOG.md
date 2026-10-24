@@ -5,6 +5,14 @@ Database migrations run automatically at startup.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-24
+
+Maintenance release. No configuration changes; upgrade by pulling the new images or chart.
+
+### Project
+- GitHub Actions updates: setup-node 7.1.0, upload-artifact 7.0.2, download-artifact 8.0.2.
+- Fixed a flaky property-based test for log timestamps.
+
 ## [0.1.1] - 2026-10-24
 
 Security and maintenance release. No configuration changes; upgrade by pulling the new images or chart.
@@ -44,6 +52,7 @@ First release: a self-hosted AI teammate for Slack and Microsoft Teams with an a
 - Base images pinned by digest. Workflow checkouts without persisted credentials, and `main` protected against deletion and force pushes.
 - Admin UI: MCP server and header names are validated and stored without prototype (found by CodeQL). Teams text conversion removes nested tag fragments.
 
-[Unreleased]: https://github.com/v0lumehi/heinzel/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/v0lumehi/heinzel/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/v0lumehi/heinzel/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/v0lumehi/heinzel/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/v0lumehi/heinzel/releases/tag/v0.1.0

@@ -2,8 +2,8 @@ apiVersion: v2
 name: heinzel
 description: Self-hosted AI teammate for Slack and Microsoft Teams
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.1.2
+appVersion: "0.1.2"
 home: https://github.com/v0lumehi/heinzel
 sources: ["https://github.com/v0lumehi/heinzel"]
 keywords: [slack, teams, ai, assistant, llm]

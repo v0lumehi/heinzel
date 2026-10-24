@@ -2,7 +2,8 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directories: ["/", "/web"]
+    # The root covers the whole pnpm workspace (incl. web/) and updates the shared pnpm-lock.yaml.
+    directory: /
     schedule: { interval: weekly }
     cooldown: { default-days: 14 }
     groups:
@@ -11,6 +12,9 @@ updates:
     directory: /
     schedule: { interval: weekly }
     cooldown: { default-days: 14 }
+    groups:
+      # All codeql-action steps must run the same version.
+      codeql-action: { patterns: ["github/codeql-action/*"] }
   - package-ecosystem: docker
     directories: ["/", "/coder"]
     schedule: { interval: weekly }

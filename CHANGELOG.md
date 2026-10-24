@@ -5,6 +5,10 @@ Database migrations run automatically at startup.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-24
+
+Security and maintenance release. No configuration changes; upgrade by pulling the new images or chart.
+
 ### Security
 - body-parser 2.4.0 (CVE-2026-111181, denial of service on the Teams messaging endpoint via compressed request bodies).
 - Coding image rebuilt with current Debian security updates (libbrotli, CVE-2026-111497).
@@ -40,5 +44,6 @@ First release: a self-hosted AI teammate for Slack and Microsoft Teams with an a
 - Base images pinned by digest. Workflow checkouts without persisted credentials, and `main` protected against deletion and force pushes.
 - Admin UI: MCP server and header names are validated and stored without prototype (found by CodeQL). Teams text conversion removes nested tag fragments.
 
-[Unreleased]: https://github.com/v0lumehi/heinzel/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/v0lumehi/heinzel/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/v0lumehi/heinzel/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/v0lumehi/heinzel/releases/tag/v0.1.0

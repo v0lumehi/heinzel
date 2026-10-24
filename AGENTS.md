@@ -10,7 +10,7 @@ Start here when you pick up work on Heinzel. Read `docs/ARCHITECTURE.md` for the
 - External tools: MCP client + built-in web fetch (docs/TOOLS.md). Self-hosted SearXNG verified. GitLab's official MCP server and Atlassian Rovo not tested yet.
 - Coding sessions (docs/CODING.md): verified end to end with a real LLM, the Docker runner, OpenCode 2.0.32, the egress proxy and a local git daemon (branch pushed). Not yet against a real GitLab (push options → MR).
 - Docker images build: `docker build -t heinzel .` and `docker build -t heinzel-coder coder/`.
-- Released: v0.1.0 (2026-10-17) with signed multi-arch images on GHCR, the Helm chart as OCI and as a signed release asset (signature checked with cosign 3).
+- Released: v0.1.1 (2026-10-24, security patch), v0.1.0 (2026-10-17) with signed multi-arch images on GHCR, the Helm chart as OCI and as a signed release asset (signature checked with cosign 3).
 - Helm chart `deploy/helm/heinzel` verified in kind (2 replicas, non-root, read-only root fs, probes). Kubernetes coding runner verified in kind with the pod's own RBAC (Job + owned Secret, logs, state, cleanup, clone via egress proxy). NetworkPolicy enforcement NOT verified (kindnet on colima cannot enforce it: no nfnetlink_queue) — test on Calico/Cilium. CI and release workflows in `.github/workflows` (not yet run on GitHub). Release steps: docs/RELEASING.md. Changelog: CHANGELOG.md (add an entry to `[Unreleased]` for user-visible changes).
 
 ## Commands
@@ -57,6 +57,8 @@ git config user.email "aljic.zijad@gmail.com"
 ## Handoff log
 
 Append a short entry when you stop, so the next person or agent can continue.
+
+- **2026-10-24** — Release 0.1.1. CI was red after the Dependabot merges: the `/web` npm entry bumped `web/package.json` without the root lockfile (now one npm entry at the workspace root), and codeql-action `init`/`analyze` were on different versions (now grouped). Image scans: body-parser 2.4.0, CI rebuilds the `runtime` stage without cache (`no-cache-filters`) so apt updates are current, msal-node and npm/undici findings accepted until 2026-11-30 (see the `.trivyignore` files). Open: Dependabot PRs #3, #5, #6.
 
 - **2026-10-17** — Enterprise/OSS readiness: health endpoints, Helm chart (kind-tested), CI + signed releases, hardened images (Debian 13, no npm, digests), runtime settings + MCP servers in the admin UI (SECRETS_KEY, LOCKED_SETTINGS), Kubernetes coding runner, setup page, README/CONTRIBUTING/templates, coverage (Codecov), CodeQL, Scorecard, ruleset on main. Since then: Codecov active, OpenSSF Best Practices badge (passing), integration catalog in the admin UI, release v0.1.0. Open: make the GHCR packages public, NetworkPolicy check on an enforcing CNI, live test of the GitLab and Atlassian catalog entries.
 

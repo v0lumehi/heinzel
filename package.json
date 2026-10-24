@@ -1,6 +1,6 @@
 {
   "name": "heinzel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open-source, self-hosted, proactive AI teammate for Slack and Microsoft Teams. LLM-agnostic via any OpenAI-compatible gateway (e.g. Requesty).",
   "license": "Apache-2.0",
   "type": "module",

@@ -135,7 +135,8 @@ describe("properties", () => {
       .map(([d, ns]) => `${d.toISOString().slice(0, 19)}.${String(ns).padStart(9, "0")}Z`);
     fc.assert(
       fc.property(ts, ts, (a, b) => {
-        expect(compareTimestamps(a, b)).toBe(-compareTimestamps(b, a));
+        // Sum instead of negation: toBe uses Object.is, and -0 is not 0.
+        expect(compareTimestamps(a, b) + compareTimestamps(b, a)).toBe(0);
         expect(compareTimestamps(a, a)).toBe(0);
         expect(rfc3339ToDockerSince(a)).toMatch(/^\d+\.\d{9}$/);
       }),

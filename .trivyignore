@@ -1,1 +1,6 @@
-# Accepted vulnerability findings for the Heinzel image (CVE id plus exp:YYYY-MM-DD and a reason). Empty on purpose.
+# Accepted vulnerability findings for the Heinzel image (CVE id plus exp:YYYY-MM-DD and a reason).
+
+# @azure/msal-node 5.6.0 (via @microsoft/teams.apps, which requires ^5.6.0; the fix is only in 7.x), reviewed 2026-10-24.
+# The issue is in the authorization code flow. The Teams SDK only uses the client credential and federated identity
+# flows, so Heinzel is not affected. Drop this once the Teams SDK moves to msal-node 7.
+CVE-2026-109461 exp:2026-11-30

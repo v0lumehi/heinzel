@@ -71,6 +71,8 @@ jobs:
           tags: ${{ matrix.image.name }}:ci
           cache-from: type=gha,scope=${{ matrix.image.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+          # Always rebuild the final stage, so the scan sees today's OS security updates (like a release build).
+          no-cache-filters: runtime
       - name: Scan for vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

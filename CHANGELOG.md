@@ -5,6 +5,14 @@ Database migrations run automatically at startup.
 
 ## [Unreleased]
 
+### Security
+- body-parser 2.4.0 (CVE-2026-111181, denial of service on the Teams messaging endpoint via compressed request bodies).
+- Coding image rebuilt with current Debian security updates (libbrotli, CVE-2026-111497).
+- Reviewed and accepted until 2026-11-30: CVE-2026-109461 in @azure/msal-node (authorization code flow, which the Teams SDK does not use) and CVE-2026-109869 in npm's bundled undici in the coding image.
+
+### Changed
+- Admin UI dependency updates (Mantine 9.7, Vite 8.3.4).
+
 ## [0.1.0] - 2026-10-17
 
 First release: a self-hosted AI teammate for Slack and Microsoft Teams with an admin UI, Helm chart and signed images.
